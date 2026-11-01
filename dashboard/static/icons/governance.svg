@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: none;
+      }
+
+      .cls-2 {
+        stroke: #28495a;
+        stroke-linejoin: round;
+        stroke-width: 4px;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g id="Use_the_language_of_your_choice" data-name="Use the language of your choice">
+      <path id="unstructured-data" class="cls-2" d="M62,60l40,40M74,12l40,40M14,12l40,40M14,8h52M74,8h40M62,120h52M14,120h40M14,4H6v8h8s0-8,0-8ZM122,52h-8v8h8v-8ZM54,116L14,76M6,76h8v-8H6v8ZM62,52h-8v8h8v-8ZM110,100h-8v8h8v-8ZM122,116h-8v8h8v-8ZM62,116h-8v8h8v-8ZM122,4h-8v8h8V4ZM74,4h-8v8h8V4ZM14,116h-8v8s8,0,8,0v-8Z"/>
+      <rect id="Transparent_Rectangle" data-name="Transparent Rectangle" class="cls-1" width="128" height="128"/>
+    </g>
+  </g>
+</svg>

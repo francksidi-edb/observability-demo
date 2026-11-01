@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Observability Console · ClickHouse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Condensed:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root { --ink:#28495a; --navy:#28495a; --deep:#1e3d4a; --abyss:#0d1e25; --slate:#567f8d; --mist:#a8c2ca; --frost:#e8f2f5; --paper:#fff;
+  --coral:#e96f4c; --coral-soft:#fbeeea; --green:#05825f; --green-soft:#eaf5f0; --gold:#e7c568; --gold-soft:#fbf3e1; --line:#c9dbe0;
+  --head:"Roboto Condensed","Arial Narrow",Arial,sans-serif; --sans:Roboto,"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace; color-scheme:light; }
+* { box-sizing:border-box; }
+html, body { margin:0; background:#fff; color:var(--navy); font:15px/1.5 var(--sans); }
+button, input, select { font:inherit; color:inherit; }
+h1,h2,h3 { margin:0; font-family:var(--head); font-weight:700; color:var(--navy); }
+h2 { font-size:1.3rem; letter-spacing:.005em; } h3 { font-size:1.05rem; }
+.muted { color:var(--slate); } .small { font-size:.85rem; } .mono { font-family:var(--mono); font-size:.85rem; } .num { font-variant-numeric:tabular-nums; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
+
+header.top { background:#fff; border-bottom:1px solid var(--mist); position:sticky; top:0; z-index:5; }
+.bar { max-width:1280px; margin:0 auto; padding:12px 24px 0; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.brand { display:flex; align-items:center; gap:14px; padding-bottom:12px; }
+.brand img { height:34px; display:block; } .brand .vr { width:1px; height:30px; background:var(--mist); }
+.brand .name { font:800 1.25rem/1 var(--head); text-transform:uppercase; letter-spacing:.02em; }
+.brand .name small { display:block; font:400 .72rem/1.4 var(--sans); text-transform:none; letter-spacing:0; color:var(--slate); margin-top:3px; }
+nav { display:flex; gap:4px; margin-left:8px; }
+nav button { background:none; border:0; color:var(--slate); font:500 .98rem var(--head); text-transform:uppercase; letter-spacing:.06em; padding:12px 11px 13px; cursor:pointer; border-bottom:3px solid transparent; }
+nav button:hover { color:var(--navy); }
+nav button[aria-selected=true] { color:var(--navy); font-weight:700; border-bottom-color:var(--navy); }
+.pills { margin-left:auto; display:flex; gap:8px; padding-bottom:12px; flex-wrap:wrap; }
+.pill { font-size:.8rem; padding:3px 11px; border-radius:99px; background:var(--frost); display:flex; gap:7px; align-items:center; }
+.dot { width:9px; height:9px; border-radius:50%; background:var(--mist); display:inline-block; flex:none; }
+.dot.ok { background:var(--green); } .dot.bad { background:var(--coral); } .dot.warn { background:var(--gold); }
+main { max-width:1280px; margin:0 auto; padding:26px 24px 60px; }
+section.tab { display:none; } section.tab.on { display:block; }
+
+.mast { display:grid; grid-template-columns:6px 1fr; column-gap:16px; margin:4px 0 26px; }
+.mast::before { content:""; grid-row:1 / span 3; background:var(--gold); border-radius:2px; }
+.mast .eyebrow { font:500 .78rem var(--head); letter-spacing:.14em; text-transform:uppercase; color:var(--slate); }
+.mast h1 { font:800 clamp(1.45rem,2.7vw,1.95rem)/1.12 var(--head); text-transform:uppercase; letter-spacing:.01em; margin:2px 0; }
+.mast .sub { margin:5px 0 0; color:var(--slate); font-size:1rem; }
+
+.card { border-top:1px solid var(--mist); padding:20px 0 10px; margin-bottom:14px; }
+.card > .hd { display:flex; align-items:baseline; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+.card > .hd p { margin:0; }
+.btn { padding:8px 16px; border-radius:6px; border:1px solid var(--navy); background:#fff; color:var(--navy); cursor:pointer; font-weight:500; }
+.btn:hover { background:var(--frost); } .btn.primary { background:var(--navy); color:#fff; } .btn.primary:hover { background:var(--deep); }
+.btn.danger { border-color:var(--coral); color:#b8452a; } .btn.danger:hover { background:var(--coral-soft); }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+select, input[type=text], input[type=number] { padding:7px 10px; border:1px solid var(--mist); border-radius:6px; background:var(--frost); }
+input[type=range] { width:100%; accent-color:var(--navy); }
+label.f { display:flex; flex-direction:column; gap:4px; font-size:.8rem; color:var(--slate); font-weight:500; }
+.chip { display:inline-block; font-size:.75rem; padding:1px 9px; border-radius:99px; background:var(--frost); color:var(--navy); font-weight:600; }
+.chip.ok { background:var(--green-soft); color:var(--green); } .chip.bad { background:var(--coral-soft); color:#b8452a; } .chip.warn { background:var(--gold-soft); color:#7a5f10; }
+.chipbtn { border:1px solid var(--mist); background:#fff; border-radius:99px; padding:3px 12px; cursor:pointer; font-size:.85rem; }
+.chipbtn[aria-pressed=true] { background:var(--navy); border-color:var(--navy); color:#fff; }
+
+/* overview */
+.flowbox { border:1px solid var(--mist); border-radius:8px; padding:14px 10px 6px; margin-bottom:34px; overflow-x:auto; }
+#flow { width:100%; min-width:900px; display:block; } #flow text { font-family:var(--sans); } #flow .nt { font-family:var(--head); font-weight:700; }
+#flow .flow { stroke-dasharray:7 6; animation:dash .7s linear infinite; } @keyframes dash { to { stroke-dashoffset:-13; } }
+@media (prefers-reduced-motion: reduce) { #flow .flow { animation:none; } }
+.pillars { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:30px 26px; margin-bottom:38px; }
+.pillar .top { display:flex; align-items:flex-end; justify-content:space-between; border-bottom:1px solid var(--mist); padding-bottom:10px; margin-bottom:12px; }
+.pillar .no { font:800 3rem/0.9 var(--head); color:var(--mist); } .pillar img { width:40px; height:40px; }
+.pillar h3 { text-transform:uppercase; letter-spacing:.03em; font-size:1.02rem; margin-bottom:6px; }
+.pillar p { margin:0; font-size:.92rem; color:var(--slate); line-height:1.55; } .pillar p b { color:var(--navy); font-weight:500; }
+.two { display:grid; grid-template-columns:1fr 1px 1fr; gap:34px; margin-bottom:34px; } .two .vr { background:var(--mist); }
+@media (max-width:860px) { .two { grid-template-columns:1fr; } .two .vr { display:none; } }
+.two h3 { margin-bottom:10px; }
+.ruled { list-style:none; margin:0; padding:0; }
+.ruled li { display:grid; grid-template-columns:150px 1fr; gap:14px; padding:9px 0; border-bottom:1px solid var(--frost); font-size:.92rem; }
+.ruled li:first-child { border-top:2px solid var(--navy); } .ruled li b { font:700 .95rem var(--head); } .ruled li span { color:var(--slate); }
+.where { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin-bottom:20px; }
+.where .w { border:1px solid var(--mist); border-radius:8px; padding:12px 14px; }
+.where .k { font:500 .78rem var(--head); text-transform:uppercase; letter-spacing:.1em; color:var(--slate); display:flex; align-items:center; gap:8px; }
+.where .v { font-size:.95rem; margin-top:6px; min-height:1.4em; }
+.takeaway { background:var(--frost); border-left:4px solid var(--navy); border-radius:0 8px 8px 0; padding:14px 20px; font-size:1.02rem; margin-top:8px; }
+
+/* tiles and panels */
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:18px; }
+.tile { border:1px solid var(--mist); border-radius:8px; padding:14px 16px; }
+.tile .k { font:500 .78rem var(--head); text-transform:uppercase; letter-spacing:.1em; color:var(--slate); }
+.tile .v { font:700 2.2rem/1.1 var(--head); margin:2px 0; font-variant-numeric:tabular-nums; }
+.tile .d { font-size:.82rem; color:var(--slate); } .tile .d.up { color:#b8452a; } .tile .d.down { color:var(--green); }
+.tile.alert .v { color:var(--coral); }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:26px; } @media (max-width:980px) { .grid2 { grid-template-columns:1fr; } }
+.panel { border-top:1px solid var(--mist); padding:14px 0 10px; margin-bottom:10px; min-width:0; }
+.panel .ph { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
+.panel .ph h3 { font-size:1rem; text-transform:uppercase; letter-spacing:.04em; }
+.panel .ph .st { margin-left:auto; font-size:.74rem; color:var(--slate); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.banner { display:none; background:var(--coral-soft); border-left:4px solid var(--coral); border-radius:0 8px 8px 0; padding:12px 18px; margin-bottom:18px; align-items:center; gap:14px; flex-wrap:wrap; }
+.banner.on { display:flex; } .banner b { font-family:var(--head); text-transform:uppercase; letter-spacing:.04em; }
+.chartwrap { position:relative; } .chartwrap svg { display:block; width:100%; }
+.tip { position:absolute; pointer-events:none; background:var(--abyss); color:#fff; font-size:.78rem; padding:6px 9px; border-radius:6px; white-space:nowrap; display:none; z-index:3; }
+.legend { display:flex; gap:14px; flex-wrap:wrap; font-size:.78rem; color:var(--slate); margin-top:2px; } .legend i { display:inline-block; width:12px; height:3px; margin-right:5px; vertical-align:3px; border-radius:2px; }
+table { width:100%; border-collapse:collapse; font-size:.88rem; }
+th { text-align:left; font:500 .78rem var(--head); text-transform:uppercase; letter-spacing:.08em; color:var(--slate); padding:6px 10px; border-bottom:2px solid var(--navy); }
+td { padding:7px 10px; border-bottom:1px solid var(--frost); vertical-align:top; } td.r, th.r { text-align:right; }
+.sev { font:700 .72rem var(--head); letter-spacing:.06em; padding:1px 7px; border-radius:4px; background:var(--frost); }
+.sev.ERROR, .sev.FATAL { background:var(--coral-soft); color:#b8452a; } .sev.WARN { background:var(--gold-soft); color:#7a5f10; }
+.bars { display:grid; gap:9px; } .brow { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) 112px; gap:12px; align-items:center; font-size:.85rem; }
+.brow .l { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .track { height:9px; background:var(--frost); border-radius:5px; overflow:hidden; } .track i { display:block; height:100%; background:var(--navy); border-radius:5px; }
+.track i.hot { background:var(--coral); }
+.logline { font:12px/1.5 var(--mono); display:grid; grid-template-columns:62px 118px 1fr; gap:8px; padding:3px 0; border-bottom:1px solid var(--frost); }
+.logline .m { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.logline.ERROR .m, .logline.FATAL .m { color:#b8452a; } .logline.WARN .m { color:#7a5f10; }
+.bigs { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:18px; margin-bottom:16px; }
+.bigs .k { font:500 .78rem var(--head); text-transform:uppercase; letter-spacing:.1em; color:var(--slate); }
+.bigs .v { font:700 2.7rem/1.05 var(--head); font-variant-numeric:tabular-nums; }
+.progress { height:10px; background:var(--frost); border-radius:5px; overflow:hidden; margin:10px 0 6px; } .progress i { display:block; height:100%; background:var(--navy); width:0; transition:width .4s; }
+.hm text { font-size:11px; fill:var(--slate); }
+.gov { display:grid; grid-template-columns:1fr 1fr; gap:30px; } @media (max-width:900px) { .gov { grid-template-columns:1fr; } }
+.scan { background:var(--frost); border-left:4px solid var(--navy); border-radius:0 8px 8px 0; padding:12px 18px; margin:12px 0; display:flex; gap:26px; flex-wrap:wrap; }
+.scan div b { display:block; font:700 1.5rem var(--head); font-variant-numeric:tabular-nums; } .scan div span { font-size:.78rem; color:var(--slate); }
+details.snip { border-bottom:1px solid var(--frost); } details.snip summary { list-style:none; display:flex; align-items:center; gap:12px; padding:11px 2px; cursor:pointer; }
+details.snip summary::-webkit-details-marker { display:none; }
+details.snip summary::before { content:""; width:7px; height:7px; border-right:2px solid var(--slate); border-bottom:2px solid var(--slate); transform:rotate(-45deg); transition:transform .15s; flex:none; margin:0 4px 0 2px; }
+details.snip[open] summary::before { transform:rotate(45deg); }
+.snip .lang { font:500 .72rem var(--head); letter-spacing:.1em; text-transform:uppercase; background:var(--frost); padding:2px 9px; border-radius:99px; min-width:58px; text-align:center; }
+.snip .copy { margin-left:auto; }
+.snip pre { margin:0 0 14px; padding:14px 16px; background:var(--frost); border:1px solid var(--mist); border-radius:8px; overflow:auto; max-height:460px; font:12.5px/1.6 var(--mono); }
+.chead { display:grid; grid-template-columns:auto 40px 1fr; gap:16px; align-items:end; border-bottom:1px solid var(--mist); padding-bottom:12px; margin:26px 0 6px; }
+.chead .no { font:800 3rem/0.9 var(--head); color:var(--mist); } .chead img { width:40px; height:40px; } .chead h2 { text-transform:uppercase; letter-spacing:.03em; margin:0; } .chead p { margin:2px 0 0; color:var(--slate); font-size:.92rem; }
+.empty { padding:22px; text-align:center; color:var(--slate); background:var(--frost); border-radius:8px; border:1px dashed var(--mist); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <div class="brand"><img src="/static/edb_logo.png" alt="EDB Postgres AI"><span class="vr"></span>
+      <span class="name">Observability Console<small>Go simulator → Kafka → ClickHouse</small></span></div>
+    <nav role="tablist" id="nav">
+      <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+      <button role="tab" data-tab="pipeline" aria-selected="false">Pipeline</button>
+      <button role="tab" data-tab="dash" aria-selected="false">Dashboard</button>
+      <button role="tab" data-tab="explore" aria-selected="false">Explore</button>
+      <button role="tab" data-tab="govern" aria-selected="false">Govern</button>
+      <button role="tab" data-tab="code" aria-selected="false">Code</button>
+    </nav>
+    <div class="pills"><span class="pill num"><i class="dot" id="p-dot"></i><span id="p-ver">connecting…</span></span></div>
+  </div>
+</header>
+<main>
+
+<!-- ======================================================= OVERVIEW -->
+<section class="tab on" id="tab-overview">
+  <div class="mast"><div class="eyebrow">Process</div>
+    <h1>Telemetry flows from a Go simulator through Kafka into ClickHouse, and the dashboard reads it back in milliseconds</h1>
+    <p class="sub">One store for logs and metrics. Every panel in this console shows how much ClickHouse read to answer it.</p></div>
+  <div class="flowbox"><svg id="flow" viewBox="0 0 1180 230" role="img" aria-label="Flow: Go simulator, Kafka, ClickHouse, dashboard">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#567f8d"/></marker></defs>
+    <g id="flow-nodes"></g></svg></div>
+  <div class="pillars">
+    <div class="pillar"><div class="top"><span class="no">01</span><img src="/static/icons/real_time.svg" alt=""></div><h3>Ingest</h3><p>A Go program emits <b>JSON events</b> for a fleet of services and Postgres clusters. Kafka buffers them, and ClickHouse consumes the topics with its Kafka engine.</p></div>
+    <div class="pillar"><div class="top"><span class="no">02</span><img src="/static/icons/warehouse.svg" alt=""></div><h3>Store</h3><p>One <b>MergeTree</b> table per signal, sorted by service, severity and time, compressed column by column, expired by a 90-day TTL.</p></div>
+    <div class="pillar"><div class="top"><span class="no">03</span><img src="/static/icons/analytical.svg" alt=""></div><h3>Query</h3><p>The sort key and a sparse index let a search read <b>only the ranges that match</b>. Rows read and time are shown next to every result.</p></div>
+    <div class="pillar"><div class="top"><span class="no">04</span><img src="/static/icons/machine_learning.svg" alt=""></div><h3>Time series</h3><p><b>Materialized views</b> keep per-minute rollups next to the raw rows, so 30 days of charts cost the same as 30 minutes.</p></div>
+    <div class="pillar"><div class="top"><span class="no">05</span><img src="/static/icons/governance.svg" alt=""></div><h3>Govern</h3><p><b>Roles, row policies and quotas</b> in the database, and every query lands in the query log.</p></div>
+  </div>
+  <div class="two">
+    <div><h3>Why ClickHouse for telemetry</h3>
+      <ul class="ruled">
+        <li><b>Columnar storage</b><span>Repetitive fields such as service, host and severity compress to almost nothing.</span></li>
+        <li><b>Sparse index</b><span>Low-cardinality columns first in the sort key skip most of the data for a time-bounded search.</span></li>
+        <li><b>Rollups on insert</b><span>Materialized views aggregate while data arrives, no scheduled jobs.</span></li>
+        <li><b>Streaming in</b><span>The Kafka engine reads topics directly. No collector code on the database side.</span></li>
+        <li><b>Scale-out</b><span>Shared-nothing shards and replicas when one box is no longer enough.</span></li>
+      </ul></div>
+    <span class="vr"></span>
+    <div><h3>What changes on the bill</h3>
+      <ul class="ruled">
+        <li><b>Per core</b><span>EDB prices ClickHouse per core, not per GB or per query. Retention and cardinality stop driving the cost.</span></li>
+        <li><b>Open source</b><span>Unmodified ClickHouse. No proprietary format, so you can migrate away freely.</span></li>
+        <li><b>Supported</b><span>EDB-signed packages, SLAs, CVE response and break/fix.</span></li>
+        <li><b>Your data</b><span>Runs in your environment, next to your Postgres estate and the open Iceberg catalog.</span></li>
+      </ul></div>
+  </div>
+  <h3 style="margin-bottom:10px">Where you are</h3>
+  <div class="where" id="ov-status"></div>
+  <div class="takeaway">The simulator, the history and the live stream all land in the same two tables. Nothing on this page is a screenshot.</div>
+</section>
+
+<!-- ======================================================= PIPELINE -->
+<section class="tab" id="tab-pipeline">
+  <div class="mast"><div class="eyebrow">Ingest</div><h1>Start the stream, change its rate, load history</h1>
+    <p class="sub">Live events go through Kafka. History is generated inside ClickHouse so billions of rows load in minutes.</p></div>
+  <div class="grid2">
+    <div class="card"><div class="hd"><h2>Go simulator</h2><span class="chip" id="sim-chip">–</span></div>
+      <div class="bigs"><div><div class="k">Sent by simulator</div><div class="v num" id="b-sent">–</div></div>
+        <div><div class="k">Events per second</div><div class="v num" id="b-eps">–</div></div></div>
+      <label class="f">Target rate <span id="rate-lab" class="num" style="color:var(--navy);font-weight:700"></span>
+        <input type="range" id="rate" min="0" max="100" value="50"></label>
+      <div class="row" style="margin-top:14px"><button class="btn primary" id="sim-start">Start</button><button class="btn" id="sim-stop">Stop</button>
+        <span style="flex:1"></span><button class="btn danger" id="inc-on">Trigger bad deploy</button><button class="btn" id="inc-off">Resolve</button></div>
+      <p class="muted small" id="sim-msg" style="margin:10px 0 0">The bad deploy rolls release v2.42.0 out to 60% of the payments hosts: more errors, higher latency, lock waits on the payments Postgres cluster.</p>
+    </div>
+    <div class="card"><div class="hd"><h2>ClickHouse</h2><span class="chip" id="ch-chip">–</span></div>
+      <div class="bigs"><div><div class="k">Rows in obs.logs</div><div class="v num" id="b-rows">–</div></div>
+        <div><div class="k">Rows per second</div><div class="v num" id="b-rps">–</div></div></div>
+      <div class="chartwrap" id="rps-chart"></div>
+      <div class="row small muted" style="margin-top:8px"><span>Pipeline lag: <b id="b-lag" class="num" style="color:var(--navy)">–</b></span><span>Metrics rows: <b id="b-mrows" class="num" style="color:var(--navy)">–</b></span></div>
+    </div>
+  </div>
+  <div class="card"><div class="hd"><h2>Storage</h2><p class="muted small">From system.parts, active parts only</p></div>
+    <div class="tiles" id="storage"></div></div>
+  <div class="card"><div class="hd"><h2>History backfill</h2><p class="muted small">Generated inside ClickHouse with INSERT … SELECT FROM numbers_mt(). Synthetic data, same patterns as the live stream, with two past incidents.</p></div>
+    <div class="row">
+      <label class="f">Rows <select id="bf-rows"><option value="10">10 million</option><option value="100" selected>100 million</option><option value="500">500 million</option><option value="1000">1 billion</option><option value="2000">2 billion</option><option value="5000">5 billion</option></select></label>
+      <label class="f">History <select id="bf-days"><option value="7">7 days</option><option value="30">30 days</option><option value="90" selected>90 days</option></select></label>
+      <button class="btn primary" id="bf-start" style="align-self:flex-end">Start backfill</button><button class="btn" id="bf-stop" style="align-self:flex-end">Stop</button>
+      <span class="muted small" id="bf-msg" style="align-self:flex-end"></span></div>
+    <div class="progress"><i id="bf-bar"></i></div><div class="small muted num" id="bf-txt">idle</div>
+  </div>
+</section>
+
+<!-- ======================================================= DASHBOARD -->
+<section class="tab" id="tab-dash">
+  <div class="mast"><div class="eyebrow">Live</div><h1>Service health across the fleet</h1>
+    <p class="sub">Panels read the one-minute rollups; switch to raw rows to see the same answer scanned from the full table.</p></div>
+  <div class="row" style="margin-bottom:16px">
+    <label class="f">Range <select id="d-range"><option value="15">Last 15 minutes</option><option value="60">Last hour</option><option value="180" selected>Last 3 hours</option><option value="1440">Last 24 hours</option><option value="10080">Last 7 days</option><option value="43200">Last 30 days</option></select></label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-end" id="d-svc"></div>
+    <span id="d-focus" style="align-self:flex-end"></span><span style="flex:1"></span>
+    <label class="check" style="display:flex;gap:8px;align-items:center;align-self:flex-end;font-size:.88rem"><input type="checkbox" id="d-raw"> Scan raw rows</label>
+    <label class="check" style="display:flex;gap:8px;align-items:center;align-self:flex-end;font-size:.88rem"><input type="checkbox" id="d-auto" checked> Auto refresh 5 s</label>
+  </div>
+  <div class="banner" id="d-banner"><b>Incident detected</b><span id="d-bmsg"></span><button class="btn danger" id="d-invest">Investigate in Explore</button></div>
+  <div class="tiles" id="d-tiles"></div>
+  <div class="grid2">
+    <div class="panel"><div class="ph"><h3>Error rate <span class="muted small" style="text-transform:none">· click a spike to focus the panels below</span></h3><span class="st" id="st-err"></span></div><div class="chartwrap" id="c-err"></div></div>
+    <div class="panel"><div class="ph"><h3>p99 latency by service</h3><span class="st" id="st-lat"></span></div><div class="chartwrap" id="c-lat"></div><div class="legend" id="lg-lat"></div></div>
+  </div>
+  <div class="panel"><div class="ph"><h3>Error rate heatmap by service <span class="muted small" style="text-transform:none">· light = 0%, coral = 12% or more</span></h3><span class="st" id="st-hm"></span></div><div class="chartwrap" id="c-hm"></div></div>
+  <div class="grid2">
+    <div class="panel"><div class="ph"><h3>Top errors</h3><span class="st" id="st-top"></span></div><div class="bars" id="c-top"></div></div>
+    <div class="panel"><div class="ph"><h3>Errors by release <span class="muted small" style="text-transform:none">(payments)</span></h3><span class="st" id="st-ver"></span></div><div id="c-ver"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="panel"><div class="ph"><h3>Postgres lock waits by cluster</h3><span class="st" id="st-pg"></span></div><div class="chartwrap" id="c-pg"></div><div class="legend" id="lg-pg"></div></div>
+    <div class="panel"><div class="ph"><h3>Live log tail</h3><span class="st" id="st-tail"></span></div><div id="c-tail"></div></div>
+  </div>
+  <p class="muted small" id="d-foot" style="margin-top:6px"></p>
+</section>
+
+<!-- ======================================================= EXPLORE -->
+<section class="tab" id="tab-explore">
+  <div class="mast"><div class="eyebrow">Search</div><h1>Find the log lines behind the chart</h1>
+    <p class="sub">Filter by service, severity and text, or paste a trace ID. The bar shows what ClickHouse had to read.</p></div>
+  <div class="row" style="margin-bottom:12px">
+    <label class="f">Service <select id="x-svc"><option>all</option></select></label>
+    <label class="f">Severity <select id="x-sev"><option>all</option><option>ERROR</option><option>FATAL</option><option>WARN</option><option>INFO</option></select></label>
+    <label class="f">Window <select id="x-min"><option value="15">15 minutes</option><option value="60">1 hour</option><option value="1440">24 hours</option><option value="10080">7 days</option><option value="43200">30 days</option></select></label>
+    <label class="f" style="flex:1;min-width:240px">Text or trace ID <input type="text" id="x-q" placeholder="timeout, deadlock, 3f2a…-uuid"></label>
+    <button class="btn primary" id="x-go" style="align-self:flex-end">Search</button>
+  </div>
+  <div class="row" style="margin-bottom:6px"><span class="muted small">Try:</span>
+    <button class="chipbtn" data-q="payments|ERROR|15|timeout">payments errors with “timeout”</button>
+    <button class="chipbtn" data-q="postgres|ERROR|60|deadlock">postgres deadlocks</button>
+    <button class="chipbtn" data-q="all|FATAL|1440|">fatal in 24 h</button></div>
+  <div class="scan" id="x-scan" style="display:none"></div>
+  <div id="x-res"></div>
+</section>
+
+<!-- ======================================================= GOVERN -->
+<section class="tab" id="tab-govern">
+  <div class="mast"><div class="eyebrow">Governance</div><h1>Same query, different people, different rows</h1>
+    <p class="sub">A row policy limits the payments team to its own service. No copy of the data, no second system.</p></div>
+  <div class="gov" id="g-cols"></div>
+  <div class="card"><div class="hd"><h2>Audit</h2><p class="muted small">system.query_log, last queries by these users</p></div><div id="g-audit"></div></div>
+</section>
+
+<!-- ======================================================= CODE -->
+<section class="tab" id="tab-code">
+  <div class="mast"><div class="eyebrow">Reproduce</div><h1>Every statement behind this demo</h1><p class="sub">Copy a snippet, paste it into clickhouse-client. The SQL files are the ones the app runs.</p></div>
+  <div id="code-body"></div>
+</section>
+</main>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const SERVICES = ["checkout","payments","auth","search","inventory","notifications","postgres"];
+const C = { navy:"#28495a", slate:"#567f8d", mist:"#a8c2ca", frost:"#e8f2f5", coral:"#e96f4c", gold:"#e7c568", green:"#05825f", deep:"#1e3d4a" };
+const PAL = ["#28495a","#567f8d","#a8c2ca","#e7c568","#05825f","#7a5f10","#1e3d4a"];
+const state = { focus:null, tab:"overview", svc:"all", sim:null, health:null, ctr:[], lastCtr:null, rps:[], dashTimer:null, tailTimer:null };
+
+async function api(path, opt) {
+  const r = await fetch(path, opt);
+  if (!r.ok) throw new Error((await r.text()).slice(0,200));
+  return r.json();
+}
+const post = (p, body) => api(p, { method:"POST", headers:{"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const nf = n => (n == null ? "–" : Math.round(n).toLocaleString("en-US"));
+function human(n) { if (n == null) return "–"; const a=Math.abs(n); if (a>=1e9) return (n/1e9).toFixed(2)+" B"; if (a>=1e6) return (n/1e6).toFixed(1)+" M"; if (a>=1e3) return (n/1e3).toFixed(1)+" k"; return String(Math.round(n)); }
+function bytes(n) { if (n == null) return "–"; const u=["B","KB","MB","GB","TB"]; let i=0; while (n>=1024 && i<4) { n/=1024; i++; } return n.toFixed(i?1:0)+" "+u[i]; }
+function st(s) { return s ? `${s.ms} ms · ${human(s.read_rows)} rows · ${bytes(s.read_bytes)}` : ""; }
+function tfmt(t, span) { const d=new Date(t*1000), p=n=>String(n).padStart(2,"0");
+  return span > 36*3600 ? `${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:00` : `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`; }
+
+/* ------------------------------------------------------------------ tabs */
+function show(tab) {
+  state.tab = tab;
+  $$("nav button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === tab));
+  $$("section.tab").forEach(s => s.classList.toggle("on", s.id === "tab-"+tab));
+  clearInterval(state.dashTimer); clearInterval(state.tailTimer);
+  if (tab === "dash") { loadDash(); state.dashTimer = setInterval(() => { if ($("#d-auto").checked) loadDash(true); }, 5000); state.tailTimer = setInterval(loadTail, 2000); }
+  if (tab === "govern") loadGov();
+  if (tab === "code") loadCode();
+  if (tab === "explore" && !$("#x-res").innerHTML) $("#x-go").click();
+  location.hash = tab;
+}
+$$("nav button").forEach(b => b.onclick = () => show(b.dataset.tab));
+
+/* ------------------------------------------------------------------ charts */
+function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); const m = v/p; return (m<=1?1:m<=2?2:m<=5?5:10)*p; }
+function line(el, series, o = {}) {
+  const box = typeof el === "string" ? $(el) : el, W = Math.max(300, box.clientWidth), H = o.h || 210, m = { l:60, r:12, t:10, b:24 };
+  const all = series.flatMap(s => s.pts); if (!all.length) { box.innerHTML = '<div class="empty">No data in this range</div>'; return; }
+  const t0 = Math.min(...all.map(p=>p[0])), t1 = Math.max(...all.map(p=>p[0])), span = Math.max(1, t1-t0);
+  const ymax = o.ymax || niceMax(Math.max(...all.map(p=>p[1])) * 1.08);
+  const x = t => m.l + (t-t0)/span*(W-m.l-m.r), y = v => H-m.b - v/ymax*(H-m.t-m.b);
+  let g = "";
+  for (let i=0;i<=4;i++) { const v = ymax*i/4, yy = y(v); g += `<line x1="${m.l}" x2="${W-m.r}" y1="${yy}" y2="${yy}" stroke="${i?"#e8f2f5":"#a8c2ca"}"/><text x="${m.l-6}" y="${yy+4}" text-anchor="end" font-size="11" fill="#567f8d">${(o.yfmt||human)(v)}</text>`; }
+  for (let i=0;i<=5;i++) { const t = t0 + span*i/5; g += `<text x="${x(t)}" y="${H-6}" text-anchor="${i==0?"start":i==5?"end":"middle"}" font-size="11" fill="#567f8d">${tfmt(t, span)}</text>`; }
+  (o.bands||[]).forEach(b => g += `<rect x="${x(b[0])}" y="${m.t}" width="${Math.max(2,x(b[1])-x(b[0]))}" height="${H-m.t-m.b}" fill="#fbeeea"/>`);
+  series.forEach((s, i) => {
+    const d = s.pts.map((p,k) => (k?"L":"M")+x(p[0]).toFixed(1)+" "+y(p[1]).toFixed(1)).join(" ");
+    if (o.area && i === 0) g += `<path d="${d} L${x(s.pts[s.pts.length-1][0])} ${H-m.b} L${x(s.pts[0][0])} ${H-m.b}Z" fill="${s.color}" opacity=".08"/>`;
+    g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.w||2}" ${s.dash?'stroke-dasharray="4 4"':""} stroke-linejoin="round"/>`;
+  });
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}">${g}<line class="cur" y1="${m.t}" y2="${H-m.b}" stroke="#28495a" stroke-width="1" style="display:none"/><rect class="hit" x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent"/></svg><div class="tip"></div>`;
+  const svg = box.querySelector("svg"), tip = box.querySelector(".tip"), cur = svg.querySelector(".cur");
+  svg.querySelector(".hit").addEventListener("mousemove", e => {
+    const r = svg.getBoundingClientRect(), px = (e.clientX-r.left)/r.width*W, t = t0 + (px-m.l)/(W-m.l-m.r)*span;
+    const rows = series.map(s => { let b=null; for (const p of s.pts) if (!b || Math.abs(p[0]-t) < Math.abs(b[0]-t)) b=p; return b && [s, b]; }).filter(Boolean);
+    if (!rows.length) return; cur.setAttribute("x1", x(rows[0][1][0])); cur.setAttribute("x2", x(rows[0][1][0])); cur.style.display = "";
+    tip.innerHTML = `<b>${tfmt(rows[0][1][0], span)} UTC</b><br>` + rows.map(([s,p]) => `<span style="color:${s.color==="#28495a"?"#a8c2ca":s.color}">●</span> ${esc(s.name)}: ${(o.yfmt||human)(p[1])}`).join("<br>");
+    tip.style.display = "block"; tip.style.left = Math.min(box.clientWidth-170, Math.max(0, (e.clientX-r.left)+12))+"px"; tip.style.top = "6px";
+  });
+  if (o.onpick) { const hit = svg.querySelector(".hit"); hit.style.cursor = "pointer";
+    hit.addEventListener("click", e => { const r = svg.getBoundingClientRect(), px = (e.clientX-r.left)/r.width*W; o.onpick(Math.round(t0 + (px-m.l)/(W-m.l-m.r)*span)); }); }
+  svg.querySelector(".hit").addEventListener("mouseleave", () => { tip.style.display="none"; cur.style.display="none"; });
+}
+function bandsFrom(pts, key, factor) { // contiguous buckets well above the median
+  if (pts.length < 6) return [];
+  const v = pts.map(p => p[key]).sort((a,b)=>a-b), med = v[Math.floor(v.length/2)], thr = Math.max(med*factor, med+1), out = []; let cur = null;
+  pts.forEach(p => { if (p[key] > thr) { cur ? cur[1]=p.t : cur=[p.t,p.t]; } else if (cur) { out.push(cur); cur=null; } });
+  if (cur) out.push(cur); return out;
+}
+function heat(el, d) {
+  const box = $(el), W = Math.max(400, box.clientWidth), rowH = 22, lw = 100, H = SERVICES.length*rowH + 26;
+  const times = [...new Set(d.cells.map(c=>c[0]))].sort((a,b)=>a-b); if (!times.length) { box.innerHTML='<div class="empty">No data</div>'; return; }
+  const cw = (W-lw-8)/times.length, idx = Object.fromEntries(times.map((t,i)=>[t,i])), span = times[times.length-1]-times[0];
+  const col = p => { const f = Math.min(1, p/12); const a=[232,242,245], b=[233,111,76]; return `rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*f)).join(",")})`; };
+  let g = SERVICES.map((s,i)=>`<text x="${lw-8}" y="${i*rowH+15}" text-anchor="end">${s}</text>`).join("");
+  d.cells.forEach(c => { const r = SERVICES.indexOf(c[1]); if (r<0) return;
+    g += `<rect x="${lw+idx[c[0]]*cw}" y="${r*rowH+2}" width="${Math.max(1,cw-1)}" height="${rowH-3}" rx="2" fill="${col(c[2])}"><title>${c[1]} ${tfmt(c[0],span)} UTC: ${c[2]}% errors (${nf(c[3])} events)</title></rect>`; });
+  for (let i=0;i<=5;i++) { const k=Math.min(times.length-1, Math.round(i/5*(times.length-1))); g += `<text x="${lw+k*cw+cw/2}" y="${H-6}" text-anchor="${i==0?"start":i==5?"end":"middle"}">${tfmt(times[k],span)}</text>`; }
+  box.innerHTML = `<svg class="hm" viewBox="0 0 ${W} ${H}" height="${H}">${g}</svg>`;
+}
+function bars(el, rows, o) {
+  const max = Math.max(1, ...rows.map(r => r.v));
+  $(el).innerHTML = rows.length ? rows.map(r => `<div class="brow"><span class="l" title="${esc(r.l)}">${esc(r.l)}</span><div class="track"><i class="${r.hot?"hot":""}" style="width:${(r.v/max*100).toFixed(1)}%"></i></div><span class="num" style="text-align:right">${esc(r.r)}</span></div>`).join("") : '<div class="empty">Nothing in this window</div>';
+}
+
+/* ------------------------------------------------------------------ health, overview */
+async function refreshHealth() {
+  try {
+    const h = await api("/api/health"); state.health = h;
+    $("#p-dot").className = "dot " + (h.ok ? "ok" : "bad");
+    $("#p-ver").textContent = h.ok ? `ClickHouse ${h.version} · ${human(h.log_rows)} rows` : "ClickHouse unreachable";
+    if (h.ok) renderStorage(h);
+  } catch (e) { $("#p-dot").className = "dot bad"; }
+  renderWhere(); renderFlow();
+}
+function renderStorage(h) {
+  const t = h.tables || {}, lg = t.logs || {};
+  const tiles = [["Raw logs on disk", bytes(h.compressed), `${human(h.log_rows)} rows`], ["Bytes per row", h.bytes_per_row ?? "–", "compressed, all columns"],
+    ["Compression", h.ratio ? h.ratio + "×" : "–", `${bytes(h.uncompressed)} uncompressed`], ["Active parts", nf(lg.parts), `${nf(lg.partitions)} daily partitions`],
+    ["Rollup rows (1 min)", human((t.svc_1m||{}).rows), `${bytes((t.svc_1m||{}).comp)} on disk`], ["Metric samples", human((t.metrics||{}).rows), `${bytes((t.metrics||{}).comp)} on disk`]];
+  $("#storage").innerHTML = tiles.map(x => `<div class="tile"><div class="k">${x[0]}</div><div class="v">${x[1]}</div><div class="d">${x[2]}</div></div>`).join("");
+}
+function renderWhere() {
+  const h = state.health || {}, s = state.sim || {};
+  const items = [
+    ["Simulator", s.error ? "bad" : s.running ? "ok" : "warn", s.error ? "not reachable" : s.running ? `running, ${nf(s.eps)} events/s` : "stopped"],
+    ["Kafka → ClickHouse", h.lag_s != null && h.lag_s < 30 ? "ok" : "warn", h.lag_s != null ? `latest event ${h.lag_s} s old` : "no recent events"],
+    ["History", (h.log_rows||0) > 1e6 ? "ok" : "warn", `${human(h.log_rows)} log rows`],
+    ["Rollups", ((h.tables||{}).svc_1m||{}).rows ? "ok" : "warn", `${human(((h.tables||{}).svc_1m||{}).rows)} one-minute rows`],
+    ["Incident", s.incident && s.incident.active ? "bad" : "ok", s.incident && s.incident.active ? "bad deploy active on payments" : "none active"]];
+  $("#ov-status").innerHTML = items.map(i => `<div class="w"><div class="k"><i class="dot ${i[1]}"></i>${i[0]}</div><div class="v">${i[2]}</div></div>`).join("");
+}
+function renderFlow() {
+  const h = state.health || {}, s = state.sim || {};
+  const node = (x, title, sub, val, dark) => `<g><rect x="${x}" y="40" width="230" height="120" rx="10" fill="${dark?"#28495a":"#e8f2f5"}"/>
+    <text class="nt" x="${x+18}" y="76" font-size="22" fill="${dark?"#fff":"#28495a"}">${title}</text>
+    <text x="${x+18}" y="100" font-size="13" fill="${dark?"#a8c2ca":"#567f8d"}">${sub}</text>
+    <text class="nt" x="${x+18}" y="140" font-size="22" fill="${dark?"#e7c568":"#28495a"}">${val}</text></g>`;
+  const arr = x => `<line class="flow" x1="${x}" y1="100" x2="${x+78}" y2="100" stroke="#567f8d" stroke-width="2.2" marker-end="url(#ah)"/>`;
+  $("#flow-nodes").innerHTML = node(24,"Go simulator","200+ hosts, 7 services", s.error?"offline":nf(s.eps)+" ev/s") + arr(262) +
+    node(360,"Kafka","topics: logs, metrics", "8 partitions") + arr(598) +
+    node(696,"ClickHouse","MergeTree + rollups", human(h.log_rows)+" rows", true) + arr(934) +
+    `<g><rect x="1030" y="40" width="130" height="120" rx="10" fill="#e8f2f5"/><text class="nt" x="1046" y="76" font-size="22" fill="#28495a">Console</text><text x="1046" y="100" font-size="13" fill="#567f8d">this page</text><text class="nt" x="1046" y="140" font-size="22" fill="#28495a">&lt; 1 s</text></g>` +
+    `<text x="24" y="205" font-size="12" fill="#567f8d">Live events: Go → Kafka → ClickHouse Kafka engine → materialized view → MergeTree. History: INSERT … SELECT inside ClickHouse.</text>`;
+}
+
+/* ------------------------------------------------------------------ pipeline */
+const rateOf = v => Math.round(Math.pow(10, 3 + v/100*2.5)/100)*100;
+const posOf = r => Math.round((Math.log10(Math.max(1000,r))-3)/2.5*100);
+$("#rate").oninput = () => { $("#rate-lab").textContent = nf(rateOf(+$("#rate").value)) + " events/s"; };
+$("#rate").onchange = async () => { state.sim = await post("/api/sim/rate?eps="+rateOf(+$("#rate").value)); renderSim(); };
+$("#sim-start").onclick = async () => { state.sim = await post("/api/sim/start?rate="+rateOf(+$("#rate").value)); renderSim(); };
+$("#sim-stop").onclick = async () => { state.sim = await post("/api/sim/stop"); renderSim(); };
+$("#inc-on").onclick = async () => { state.sim = await post("/api/sim/incident?on=1&minutes=20"); renderSim(); };
+$("#inc-off").onclick = async () => { state.sim = await post("/api/sim/incident?on=0"); renderSim(); };
+function renderSim() {
+  const s = state.sim || {};
+  const chip = $("#sim-chip"); chip.className = "chip " + (s.error ? "bad" : s.running ? "ok" : "warn"); chip.textContent = s.error ? "offline" : s.running ? "running" : "stopped";
+  $("#b-sent").textContent = s.error ? "–" : human(s.sent_logs); $("#b-eps").textContent = s.error ? "–" : nf(s.eps);
+  if (!s.error && document.activeElement !== $("#rate")) { $("#rate").value = posOf(s.target_rate); $("#rate").oninput(); }
+  const inc = s.incident && s.incident.active; $("#inc-on").disabled = !!inc; $("#inc-off").disabled = !inc;
+  if (s.error) $("#sim-msg").textContent = s.error;
+}
+async function pollSim() { try { state.sim = await api("/api/sim/status"); } catch (e) { state.sim = { error: String(e) }; } renderSim(); if (state.tab === "overview") { renderWhere(); renderFlow(); } }
+async function pollCounters() {
+  if (state.tab !== "pipeline") return;
+  try {
+    const c = await api("/api/counters"); $("#b-rows").textContent = nf(c.logs); $("#b-mrows").textContent = nf(c.metrics);
+    if (state.lastCtr) { const rps = Math.max(0, (c.logs - state.lastCtr.logs) / (c.t - state.lastCtr.t)); $("#b-rps").textContent = nf(rps);
+      state.rps.push([c.t, rps]); state.rps = state.rps.slice(-90); line("#rps-chart", [{ name:"rows per second", color:C.navy, pts:state.rps }], { h:130, area:true }); }
+    state.lastCtr = c;
+    const h = state.health; if (h && h.lag_s != null) $("#b-lag").textContent = h.lag_s + " s";
+    $("#ch-chip").className = "chip ok"; $("#ch-chip").textContent = "connected";
+  } catch (e) { $("#ch-chip").className = "chip bad"; $("#ch-chip").textContent = "error"; }
+}
+$("#bf-start").onclick = async () => { try { await post("/api/backfill/start", { rows_millions:+$("#bf-rows").value, days:+$("#bf-days").value }); } catch (e) { $("#bf-msg").textContent = e.message; } };
+$("#bf-stop").onclick = () => post("/api/backfill/stop");
+async function pollBackfill() {
+  try { const j = await api("/api/backfill"); const pct = j.total ? j.done / j.total * 100 : 0;
+    $("#bf-bar").style.width = pct.toFixed(1)+"%";
+    $("#bf-txt").textContent = j.state === "idle" ? "idle" : `${j.state}: ${human(j.done)} of ${human(j.total)} rows, slice ${j.slice}/${j.slices}, ${j.elapsed}s` + (j.done && j.elapsed ? `, ${human(j.done/j.elapsed)} rows/s` : "") + (j.error ? " — "+j.error : "");
+    $("#bf-start").disabled = j.state === "running"; } catch (e) {}
+}
+
+/* ------------------------------------------------------------------ dashboard */
+$("#d-svc").innerHTML = ["all", ...SERVICES].map(s => `<button class="chipbtn" data-s="${s}" aria-pressed="${s==="all"}">${s}</button>`).join("");
+$$("#d-svc button").forEach(b => b.onclick = () => { state.svc = b.dataset.s; $$("#d-svc button").forEach(x => x.setAttribute("aria-pressed", x === b)); loadDash(); });
+$("#d-range").onchange = () => loadDash(); $("#d-raw").onchange = () => loadDash();
+$("#d-invest").onclick = () => { $("#x-svc").value = "payments"; $("#x-sev").value = "ERROR"; $("#x-min").value = state.focus ? "focus" : "15"; $("#x-q").value = ""; show("explore"); $("#x-go").click(); };
+function pickFocus(t) { state.focus = [t - 900, t + 1800]; renderFocus(); loadDash(); }
+function renderFocus() {
+  const f = state.focus, el = $("#d-focus");
+  el.innerHTML = f ? `<span class="chip warn">Focus ${tfmt(f[0],0)}–${tfmt(f[1],0)} UTC <a href="#" id="d-unfocus" style="margin-left:6px;color:inherit">clear</a></span>` : "";
+  if (f) $("#d-unfocus").onclick = e => { e.preventDefault(); state.focus = null; renderFocus(); loadDash(); };
+  const opt = $("#x-min option[value=focus]");
+  if (f && !opt) $("#x-min").insertAdjacentHTML("afterbegin", '<option value="focus">Focus window</option>'); if (!f && opt) opt.remove();
+}
+let dashBusy = false;
+async function loadDash(quiet) {
+  if (dashBusy) return; dashBusy = true; const t0 = performance.now();
+  const m = +$("#d-range").value, svc = state.svc, src = $("#d-raw").checked ? "raw" : "rollup", q = `minutes=${m}&service=${svc}`;
+  const mm = Math.min(m, 60), fq = state.focus ? `&t_from=${state.focus[0]}&t_to=${state.focus[1]}` : "";
+  try {
+    const [ov, ts, sp, hm, top, ver, pg, tail] = await Promise.all([
+      api(`/api/overview?minutes=${Math.min(m,60)}&service=${svc}`), api(`/api/timeseries?${q}&source=${src}`), api(`/api/services_p99?minutes=${m}`),
+      api(`/api/heatmap?minutes=${m}`), api(`/api/top_errors?minutes=${mm}&service=${svc}${fq}`), api(`/api/versions?minutes=${mm}&service=payments${fq}`),
+      api(`/api/pg?minutes=${Math.max(m,60)}`), api(`/api/tail?n=14&service=${svc}`)]);
+    const c = ov.cur, p = ov.prev, delta = (a, b) => b ? ((a-b)/b*100) : 0;
+    const dEv = delta(c.events, p.events), dErr = c.err_pct - p.err_pct, dP = delta(c.p99, p.p99);
+    $("#d-tiles").innerHTML = [
+      ["Events", human(c.events), `${dEv>=0?"+":""}${dEv.toFixed(0)}% vs previous ${mm} min`, ""],
+      ["Error rate", c.err_pct.toFixed(2)+"%", `${dErr>=0?"+":""}${dErr.toFixed(2)} pts vs previous`, c.err_pct > 2.2*Math.max(1, p.err_pct) && c.err_pct > 3 ? "alert" : ""],
+      ["p99 latency", nf(c.p99)+" ms", `${dP>=0?"+":""}${dP.toFixed(0)}% vs previous`, p.p99 && c.p99 > 2.5*p.p99 ? "alert" : ""],
+      ["Median latency", nf(c.p50)+" ms", `window: last ${mm} min`, ""], ["Hosts reporting", nf(ov.hosts), "metrics in the last 5 min", ""]]
+      .map(x => `<div class="tile ${x[3]}"><div class="k">${x[0]}</div><div class="v">${x[1]}</div><div class="d">${x[2]}</div></div>`).join("");
+    const hot = c.err_pct > 2.2*Math.max(1, p.err_pct) && c.err_pct > 3;
+    $("#d-banner").classList.toggle("on", hot); if (hot) $("#d-bmsg").textContent = `Error rate ${c.err_pct.toFixed(1)}% is ${(c.err_pct/Math.max(0.1,p.err_pct)).toFixed(1)}× the previous ${mm} minutes.`;
+    const pts = ts.points, span = pts.length ? pts[pts.length-1].t - pts[0].t : 0;
+    line("#c-err", [{ name:"error rate %", color:C.coral, pts:pts.map(x=>[x.t, x.err_pct]) }], { yfmt:v=>v.toFixed(v<10?1:0)+"%", bands:bandsFrom(pts,"err_pct",2.2), area:true, onpick:pickFocus });
+    state.lastTs = ts;
+    $("#st-err").textContent = `${ts.source} · ${st(ts.stats)}`;
+    const keys = svc === "all" ? Object.keys(sp.series).filter(k => k !== "postgres") : [svc].filter(k => sp.series[k]);
+    line("#c-lat", keys.map((k,i) => ({ name:k, color:k==="payments"?C.coral:PAL[i%PAL.length], pts:sp.series[k], w:k==="payments"?2.4:1.6 })), { yfmt:v=>nf(v)+" ms" });
+    $("#lg-lat").innerHTML = keys.map((k,i) => `<span><i style="background:${k==="payments"?C.coral:PAL[i%PAL.length]}"></i>${k}</span>`).join(""); $("#st-lat").textContent = st(sp.stats);
+    heat("#c-hm", hm); $("#st-hm").dataset.x = 1; $("#st-hm").textContent = st(hm.stats);
+    bars("#c-top", top.rows.map(r => ({ l:r.msg, v:+r.n, r:`${human(+r.n)} · ${r.hosts} h`, hot:/lock|deadlock|timeout/i.test(r.msg) })));
+    $("#st-top").textContent = st(top.stats);
+    $("#c-ver").innerHTML = ver.rows.length ? `<table><tr><th>Release</th><th class="r">Events</th><th class="r">Errors</th><th class="r">Error rate</th><th class="r">p99</th></tr>` +
+      ver.rows.map(r => `<tr><td class="mono">${esc(r.version)}</td><td class="r num">${nf(r.n)}</td><td class="r num">${nf(r.errors)}</td><td class="r num" style="${r.err_pct>10?"color:#b8452a;font-weight:700":""}">${r.err_pct}%</td><td class="r num">${nf(r.p99)} ms</td></tr>`).join("") + `</table>` : '<div class="empty">No payments events in this window</div>';
+    $("#st-ver").textContent = st(ver.stats);
+    const pk = Object.keys(pg.series); line("#c-pg", pk.map((k,i) => ({ name:k, color:k==="payments"?C.coral:PAL[i%PAL.length], pts:pg.series[k], w:k==="payments"?2.4:1.6 })), { yfmt:v=>v.toFixed(0) });
+    $("#lg-pg").innerHTML = pk.map((k,i) => `<span><i style="background:${k==="payments"?C.coral:PAL[i%PAL.length]}"></i>${k}</span>`).join(""); $("#st-pg").textContent = st(pg.stats);
+    renderTail(tail);
+    const ms = Math.round(performance.now() - t0), rr = [ov,ts,sp,hm,top,ver,pg,tail].reduce((a,x)=>a+(x.stats?x.stats.read_rows:0),0);
+    $("#d-foot").textContent = `All ${8} panels refreshed in ${ms} ms, ${human(rr)} rows read in total. Times are UTC.`;
+  } catch (e) { $("#d-foot").textContent = "Dashboard error: " + e.message; }
+  dashBusy = false;
+}
+function renderTail(t) { $("#c-tail").innerHTML = t.rows.map(r => `<div class="logline ${r.severity}"><span>${r.t}</span><span>${esc(r.host)}</span><span class="m" title="${esc(r.message)}">${esc(r.message)}</span></div>`).join("") || '<div class="empty">No events in the last 30 seconds. Start the simulator.</div>'; $("#st-tail").textContent = st(t.stats); }
+async function loadTail() { if (state.tab === "dash") try { renderTail(await api(`/api/tail?n=14&service=${state.svc}`)); } catch (e) {} }
+
+/* ------------------------------------------------------------------ explore */
+$("#x-svc").innerHTML = ["all", ...SERVICES].map(s => `<option>${s}</option>`).join("");
+$$("#tab-explore .chipbtn").forEach(b => b.onclick = () => { const [s, v, m, q] = b.dataset.q.split("|"); $("#x-svc").value = s; $("#x-sev").value = v; $("#x-min").value = m; $("#x-q").value = q; $("#x-go").click(); });
+$("#x-q").onkeydown = e => { if (e.key === "Enter") $("#x-go").click(); };
+$("#x-go").onclick = async () => {
+  const p = new URLSearchParams({ service:$("#x-svc").value, severity:$("#x-sev").value, minutes:$("#x-min").value === "focus" ? 15 : $("#x-min").value, q:$("#x-q").value, limit:100 });
+  if ($("#x-min").value === "focus" && state.focus) { p.set("t_from", state.focus[0]); p.set("t_to", state.focus[1]); }
+  $("#x-res").innerHTML = '<div class="empty">Searching…</div>';
+  try {
+    const d = await api("/api/search?" + p), s = d.stats, pct = d.total_rows ? Math.max(0, 100 - s.read_rows / d.total_rows * 100) : 0;
+    $("#x-scan").style.display = "flex";
+    $("#x-scan").innerHTML = `<div><b>${s.ms} ms</b><span>query time</span></div><div><b>${human(s.read_rows)}</b><span>rows read</span></div><div><b>${bytes(s.read_bytes)}</b><span>bytes read</span></div><div><b>${human(d.total_rows)}</b><span>rows in table</span></div><div><b>${pct.toFixed(2)}%</b><span>skipped by the index</span></div><div><b>${d.rows.length}</b><span>rows returned</span></div>`;
+    $("#x-res").innerHTML = d.rows.length ? `<table><tr><th>Time (UTC)</th><th>Service</th><th>Host</th><th>Severity</th><th class="r">ms</th><th>Message</th></tr>` +
+      d.rows.map(r => `<tr><td class="mono">${r.time}</td><td>${r.service}</td><td class="mono">${esc(r.host)}</td><td><span class="sev ${r.severity}">${r.severity}</span></td><td class="r num">${r.duration_ms||""}</td><td title="trace ${r.trace_id}">${esc(r.message)}</td></tr>`).join("") + "</table>" : '<div class="empty">No matching events</div>';
+  } catch (e) { $("#x-res").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+};
+
+/* ------------------------------------------------------------------ govern */
+async function loadGov() {
+  const g = await api("/api/govern");
+  $("#g-cols").innerHTML = g.users.map(u => `<div><h3>${esc(u.label)}</h3><p class="muted small mono" style="margin:2px 0 10px">user: ${u.user}${u.stats ? " · " + st(u.stats) : ""}</p>` +
+    (u.error ? `<div class="empty">${esc(u.error)}</div>` : `<table><tr><th>Service</th><th class="r">Events (1 h)</th><th class="r">Errors</th></tr>${u.rows.map(r => `<tr><td>${r.service}</td><td class="r num">${nf(r.events)}</td><td class="r num">${nf(r.errors)}</td></tr>`).join("")}</table>`) + `</div>`).join("");
+  $("#g-audit").innerHTML = g.audit && g.audit.length ? `<table><tr><th>At</th><th>User</th><th class="r">ms</th><th class="r">Rows read</th><th class="r">Read</th><th>Query</th></tr>${g.audit.map(r => `<tr><td class="mono">${r.at}</td><td>${r.user}</td><td class="r num">${r.ms}</td><td class="r num">${nf(r.read_rows)}</td><td class="r num">${r.read}</td><td class="mono small">${esc(r.query)}</td></tr>`).join("")}</table>` : `<div class="empty">No audit rows yet. ${esc(g.audit_note || "Reload this tab after a few queries.")}</div>`;
+}
+
+/* ------------------------------------------------------------------ code */
+const EXTRA = [
+  ["bash", "Run the simulator", "./obs-simulator -brokers localhost:9092 -rate 50000 -http :8090\n# dry run, no Kafka:\n./obs-simulator -dry-run /tmp/sample -duration 20s -rate 40000"],
+  ["sql", "Find the cause of an incident", "-- which release is failing?\nSELECT attrs['version'] AS version, count() AS n, countIf(severity IN ('ERROR','FATAL')) AS errors\nFROM obs.logs WHERE service = 'payments' AND ts >= now() - INTERVAL 15 MINUTE\nGROUP BY version ORDER BY errors DESC;\n\n-- top error messages with numbers collapsed\nSELECT replaceRegexpAll(message, '[0-9]+', 'N') AS msg, count() AS n, uniqExact(host) AS hosts\nFROM obs.logs WHERE severity IN ('ERROR','FATAL') AND ts >= now() - INTERVAL 15 MINUTE\nGROUP BY msg ORDER BY n DESC LIMIT 8;"],
+  ["sql", "Time series from the rollup", "SELECT toStartOfInterval(minute, INTERVAL 5 MINUTE) AS t, sum(errs) / sum(cnt) * 100 AS err_pct,\n       quantilesTDigestMerge(0.5, 0.99)(lat)[2] AS p99_ms\nFROM obs.svc_1m WHERE service = 'payments' AND minute >= now() - INTERVAL 7 DAY\nGROUP BY t ORDER BY t;"],
+  ["sql", "Prove the speed", "SELECT query_duration_ms, read_rows, formatReadableSize(read_bytes) AS read, substring(query, 1, 80) AS q\nFROM system.query_log WHERE type = 'QueryFinish' AND event_time > now() - INTERVAL 2 MINUTE\nORDER BY event_time DESC LIMIT 10;\n\nSELECT table, sum(rows) AS rows, formatReadableSize(sum(data_compressed_bytes)) AS on_disk,\n       round(sum(data_compressed_bytes) / sum(rows), 1) AS bytes_per_row\nFROM system.parts WHERE database = 'obs' AND active GROUP BY table;"]
+];
+let codeLoaded = false;
+async function loadCode() {
+  if (codeLoaded) return; codeLoaded = true;
+  const files = await Promise.all(["schema","backfill","governance","metrics"].map(n => api("/api/file?name="+n)));
+  const secs = [["01","real_time","Run","Start the stream", [EXTRA[0]]], ["02","warehouse","Store","Schema, Kafka tables, rollups", [["sql", files[0].name, files[0].text]]],
+    ["03","analytical","History","Backfill inside ClickHouse", [["sql", files[1].name, files[1].text], ["sql", files[3].name, files[3].text]]],
+    ["04","machine_learning","Query","Investigate and prove the speed", EXTRA.slice(1)], ["05","governance","Govern","Roles, row policy, quota", [["sql", files[2].name, files[2].text]]]];
+  $("#code-body").innerHTML = secs.map(s => `<div class="chead"><span class="no">${s[0]}</span><img src="/static/icons/${s[1]}.svg" alt=""><div><h2>${s[2]}</h2><p>${s[3]}</p></div></div>` +
+    s[4].map(x => `<details class="snip"><summary><span class="lang">${x[0]}</span><span>${esc(x[1])}</span><button class="btn copy" type="button">Copy</button></summary><pre><code>${esc(x[2])}</code></pre></details>`).join("")).join("");
+  $$("#code-body .copy").forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(b.closest("details").querySelector("code").textContent); b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy", 1200); });
+}
+
+/* ------------------------------------------------------------------ boot */
+(async function boot() {
+  $("#rate").oninput();
+  await Promise.all([pollSim(), refreshHealth()]);
+  setInterval(pollSim, 1500); setInterval(refreshHealth, 8000); setInterval(pollCounters, 1000); setInterval(pollBackfill, 1500);
+  const h = location.hash.replace("#", ""); if (h && $("#tab-"+h)) show(h);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: none;
+      }
+
+      .cls-2 {
+        stroke: #28495a;
+        stroke-miterlimit: 10;
+        stroke-width: 4px;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g id="Dev_and_test" data-name="Dev and test">
+      <path id="deployment" class="cls-2" d="M44.57,109.34h-25.91v-25.91M44.57,18.66h-25.91v25.91M109.34,44.57v-25.91h-25.91M83.43,109.34h25.91v-25.91M18.66,18.66l43.07,43.07M109.34,109.34l-43.04-43.04M66.3,61.7l43.04-43.04M18.66,109.34l43.07-43.07M64,60.76c-1.79,0-3.24,1.45-3.24,3.24s1.45,3.24,3.24,3.24,3.24-1.45,3.24-3.24-1.45-3.24-3.24-3.24Z"/>
+      <rect id="Transparent_Rectangle" data-name="Transparent Rectangle" class="cls-1" width="128" height="128"/>
+    </g>
+  </g>
+</svg>

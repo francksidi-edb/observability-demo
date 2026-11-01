@@ -1,0 +1,16 @@
+*.pem
+*.key
+.env
+*.bak
+*.bak2
+__pycache__/
+*.pyc
+.venv/
+venv/
+simulator/obs-sim
+*.log
+*.tgz
+*.tar.gz
+*.rpm
+*.deb
+*.zip

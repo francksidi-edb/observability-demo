@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: none;
+      }
+
+      .cls-3 {
+        fill: #28495a;
+      }
+
+      .cls-2 {
+        stroke: #28495a;
+        stroke-miterlimit: 10;
+        stroke-width: 4px;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g>
+      <g id="Audio_data" data-name="Audio data">
+        <path id="application--platform" class="cls-2" d="M52,4h-24v24h24V4ZM100,4h-24v24h24V4ZM28,52H4v24h24v-24ZM76,52h-24v24h24v-24ZM124,52h-24v24h24v-24ZM8,124h112M16,124v-48M64,124v-48M112,124v-48M40,124V28M88,124V28"/>
+        <rect id="Transparent_Rectangle" data-name="Transparent Rectangle" class="cls-1" width="128" height="128"/>
+      </g>
+      <rect class="cls-3" x="76" y="4" width="22.61" height="22.61"/>
+      <rect class="cls-3" x="100" y="52.7" width="22.61" height="22.61"/>
+      <rect class="cls-3" x="4.7" y="52" width="22.61" height="22.61"/>
+    </g>
+  </g>
+</svg>

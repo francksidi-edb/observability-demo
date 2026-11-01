@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: none;
+      }
+
+      .cls-2 {
+        stroke: #28495a;
+        stroke-linejoin: round;
+        stroke-width: 4px;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g>
+      <g>
+        <g>
+          <rect class="cls-2" x="11.01" y="86.54" width="65.78" height="32.95"/>
+          <polyline class="cls-2" points="51.05 53.28 11.01 53.28 11.01 86.23 76.79 86.23 76.79 71.96"/>
+          <rect class="cls-2" x="58.54" y="101.36" width="8.77" height="18.14"/>
+        </g>
+        <rect id="Transparent_Rectangle" data-name="Transparent Rectangle" class="cls-1" x=".69" y="40.21" width="86.41" height="85.92"/>
+      </g>
+      <g id="Analyze">
+        <path id="analyze" class="cls-2" d="M79.12,11.34c-16.73,0-30.31,13.58-30.31,30.31s13.58,30.31,30.31,30.31c8.37,0,15.94-3.39,21.43-8.88,5.49-5.49,8.88-13.06,8.88-21.43,0-16.73-13.58-30.31-30.31-30.31ZM124.59,87.12l-24.05-24.05M58.71,49.91l8.28-14.34,3.72,11.43,8.4-14.46,6.76,14.46,11.44-19.01"/>
+        <rect id="Transparent_Rectangle-2" data-name="Transparent Rectangle" class="cls-1" width="128" height="128"/>
+      </g>
+    </g>
+  </g>
+</svg>

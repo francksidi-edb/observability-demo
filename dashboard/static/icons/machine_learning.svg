@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: none;
+      }
+
+      .cls-2 {
+        stroke: #28495a;
+        stroke-linejoin: round;
+        stroke-width: 4px;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g id="Machine_learning_05" data-name="Machine learning 05">
+      <g id="machine--learning--05">
+        <rect class="cls-2" x="28" y="28" width="72" height="72"/>
+        <line class="cls-2" x1="48" y1="28" x2="48" y2="16"/>
+        <circle class="cls-2" cx="48" cy="10" r="6"/>
+        <line class="cls-2" x1="80" y1="28" x2="80" y2="16"/>
+        <circle class="cls-2" cx="80" cy="10" r="6"/>
+        <circle class="cls-2" cx="64" cy="64" r="28"/>
+        <line class="cls-2" x1="80" y1="100" x2="80" y2="112"/>
+        <circle class="cls-2" cx="80" cy="118" r="6"/>
+        <line class="cls-2" x1="48" y1="100" x2="48" y2="112"/>
+        <circle class="cls-2" cx="48" cy="118" r="6"/>
+        <line class="cls-2" x1="100" y1="48" x2="112" y2="48"/>
+        <circle class="cls-2" cx="118" cy="48" r="6"/>
+        <line class="cls-2" x1="100" y1="80" x2="112" y2="80"/>
+        <circle class="cls-2" cx="118" cy="80" r="6"/>
+        <line class="cls-2" x1="28" y1="80" x2="16" y2="80"/>
+        <circle class="cls-2" cx="10" cy="80" r="6"/>
+        <line class="cls-2" x1="28" y1="48" x2="16" y2="48"/>
+        <circle class="cls-2" cx="10" cy="48" r="6"/>
+        <path class="cls-2" d="M80,86.96v-4.96c0-7.19-4.78-13.21-11.31-15.22,3.14-1.68,5.31-4.96,5.31-8.78,0-5.52-4.48-10-10-10s-10,4.48-10,10c0,3.82,2.16,7.1,5.31,8.78-6.53,2.01-11.31,8.03-11.31,15.22v4.98"/>
+      </g>
+      <rect id="Transparent_Rectangle" data-name="Transparent Rectangle" class="cls-1" width="128" height="128"/>
+    </g>
+  </g>
+</svg>

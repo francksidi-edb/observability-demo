@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: none;
+      }
+
+      .cls-2 {
+        stroke: #28495a;
+        stroke-linejoin: round;
+        stroke-width: 4px;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g id="Application_integration" data-name="Application integration">
+      <path id="analyzing--containers" class="cls-2" d="M88,64c0,13.25-10.75,24-24,24s-24-10.75-24-24,10.75-24,24-24,24,10.75,24,24ZM64,124v-56M12,32l48.6,29.91M116,96l-31.5-19.55M116,32l-48.6,29.91M64,60c-2.21,0-4,1.79-4,4s1.79,4,4,4,4-1.79,4-4-1.79-4-4-4ZM64,4L12,32v64l52,28,52-28V32L64,4Z"/>
+      <rect id="Transparent_Rectangle" data-name="Transparent Rectangle" class="cls-1" width="128" height="128"/>
+    </g>
+  </g>
+</svg>

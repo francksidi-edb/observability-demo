@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: none;
+      }
+
+      .cls-2 {
+        stroke: #28495a;
+        stroke-linejoin: round;
+        stroke-width: 4px;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g>
+      <g>
+        <path class="cls-2" d="M15.28,112.9s20.5-23.49,44.68,0c24.19,23.49,52.75,0,52.75,0"/>
+        <rect class="cls-2" x="15.28" y="63.81" width="97.44" height="49.1"/>
+        <rect class="cls-2" x="15.28" y="4.66" width="97.44" height="49.1"/>
+      </g>
+      <rect id="Transparent_Rectangle" data-name="Transparent Rectangle" class="cls-1" width="128" height="128"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: none;
+      }
+
+      .cls-2 {
+        stroke: #28495a;
+        stroke-linejoin: round;
+        stroke-width: 4px;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g id="Real_time" data-name="Real time">
+      <path id="real-time" class="cls-2" d="M72,64c0,4.42-3.45,8-7.87,8s-8.13-3.58-8.13-8c0-4.42,3.58-8,7.99-8s8.01,3.58,8.01,8ZM64,4C30.86,4,4,30.86,4,64s26.86,60,60,60,60-26.86,60-60S97.14,4,64,4ZM64,112v12M64,4v12M88,105.57l6,10.39M105.57,88l10.39,6M12.04,34l10.39,6M112,64h12M4,64h12M115.96,34l-10.39,6M12.04,94l10.39-6M88,22.43l6-10.39M34,115.96l6-10.39M60,57.07L29.36,4M68,57.07l13.89-24.05"/>
+      <rect id="Transparent_Rectangle" data-name="Transparent Rectangle" class="cls-1" width="128" height="128"/>
+    </g>
+  </g>
+</svg>
