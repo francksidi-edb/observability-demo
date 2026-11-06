@@ -526,7 +526,64 @@ async function loadGov() {
   const g = await api("/api/govern");
   $("#g-cols").innerHTML = g.users.map(u => `<div><h3>${esc(u.label)}</h3><p class="muted small mono" style="margin:2px 0 10px">user: ${u.user}${u.stats ? " · " + st(u.stats) : ""}</p>` +
     (u.error ? `<div class="empty">${esc(u.error)}</div>` : `<table><tr><th>Service</th><th class="r">Events (1 h)</th><th class="r">Errors</th></tr>${u.rows.map(r => `<tr><td>${r.service}</td><td class="r num">${nf(r.events)}</td><td class="r num">${nf(r.errors)}</td></tr>`).join("")}</table>`) + `</div>`).join("");
-  $("#g-audit").innerHTML = g.audit && g.audit.length ? `<table><tr><th>At</th><th>User</th><th class="r">ms</th><th class="r">Rows read</th><th class="r">Read</th><th>Query</th></tr>${g.audit.map(r => `<tr><td class="mono">${r.at}</td><td>${r.user}</td><td class="r num">${r.ms}</td><td class="r num">${nf(r.read_rows)}</td><td class="r num">${r.read}</td><td class="mono small">${esc(r.query)}</td></tr>`).join("")}</table>` : `<div class="empty">No audit rows yet. ${esc(g.audit_note || "Reload this tab after a few queries.")}</div>`;
+  renderAudit(g.audit, g.audit_note);
+  renderLimits();
+}
+
+const BEATS = [
+  ["sre_user", "heavy", "Full scan as SRE", "btn primary"],
+  ["payments_user", "heavy", "Same scan as Payments", "btn danger"],
+  ["payments_user", "attrs", "Payments reads attrs", "btn danger"],
+  ["payments_user", "burst", "Payments fires 30 queries", "btn danger"]
+];
+function renderAudit(rows, note) {
+  $("#g-audit").innerHTML = rows && rows.length
+    ? `<table><tr><th>At</th><th>User</th><th>Status</th><th class="r">ms</th><th class="r">Rows read</th><th class="r">Read</th><th>Query</th></tr>` +
+      rows.map(r => `<tr><td class="mono">${r.at}</td><td>${r.user}</td><td><span class="chip ${r.status === "ok" ? "ok" : "bad"}">${esc(r.status)}</span></td><td class="r num">${r.ms}</td><td class="r num">${nf(r.read_rows)}</td><td class="r num">${r.read}</td><td class="mono small">${esc(r.query)}</td></tr>`).join("") + `</table>`
+    : `<div class="empty">No audit rows yet. ${esc(note || "Run a guardrail above or reload this tab.")}</div>`;
+}
+function showTryResult(r) {
+  const who = r.user, el = $("#g-try-out");
+  if (r.kind === "burst") {
+    el.innerHTML = r.ok
+      ? `<div class="scan"><div><b>${r.ran} of ${r.planned}</b><span>queries allowed for ${esc(who)}</span></div><div><b>${nf(r.ms)} ms</b><span>total</span></div><div><b>no limit hit</b><span>raise the burst or lower the quota</span></div></div>`
+      : `<div class="scan"><div><b>${r.ran} of ${r.planned}</b><span>queries allowed for ${esc(who)}</span></div><div><b><span class="chip bad">${esc(r.error.name)}</span></b><span>code ${r.error.code}</span></div><div style="flex:1;min-width:260px"><span>${esc(r.error.message)}</span></div></div>`;
+    return;
+  }
+  el.innerHTML = r.ok
+    ? `<div class="scan"><div><b>${nf(r.ms)} ms</b><span>${esc(who)}: query time</span></div><div><b>${human(r.read_rows)}</b><span>rows read</span></div><div><b>${bytes(r.read_bytes)}</b><span>bytes read</span></div><div><b><span class="chip ok">allowed</span></b><span>${esc(JSON.stringify(r.rows[0] || {}))}</span></div></div>`
+    : `<div class="scan"><div><b>${nf(r.ms)} ms</b><span>${esc(who)}: time to reject</span></div><div><b><span class="chip bad">${esc(r.error.name)}</span></b><span>code ${r.error.code}</span></div><div style="flex:1;min-width:260px"><span>${esc(r.error.message)}</span></div></div>`;
+}
+async function runBeat(user, kind) {
+  const all = $$("#g-try button"); all.forEach(b => b.disabled = true);
+  $("#g-try-out").innerHTML = '<div class="empty">Running…</div>';
+  try { showTryResult(await post(`/api/govern/try?user=${user}&kind=${kind}`)); }
+  catch (e) { $("#g-try-out").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  all.forEach(b => b.disabled = false);
+  try { const a = await api("/api/govern/audit"); renderAudit(a.rows, a.note); } catch (e) { /* audit is best effort */ }
+}
+async function renderControls() {
+  let c; try { c = await api("/api/govern/controls"); } catch (e) { return; }
+  const li = (k, v) => `<li><b>${k}</b><span>${v}</span></li>`;
+  const grants = (c.grants || []).filter(g => !g.error).map(g => li(esc(g.user_name), `${esc(g.access_type)} on ${esc(g.database)}.${esc(g.table)}${g.columns ? " (" + esc(g.columns) + ")" : ""}${g.is_partial_revoke ? " (revoked)" : ""}`)).join("");
+  const pol = (c.policies || []).filter(p => !p.error).map(p => li("Row policy", `${esc(p.policy)} on ${esc(p.on_table)}: <span class="mono">${esc(p.filter)}</span>`)).join("");
+  const q = (c.quota || []).filter(x => !x.error).map(x => li("Quota", `${esc(x.quota_name)}: ${nf(x.max_queries)} queries and ${human(x.max_read_rows)} rows per ${nf(x.duration)} s`)).join("");
+  const p = (c.profile || []).filter(x => !x.error).map(x => `${esc(x.setting_name)} = ${esc(x.value)}`).join(", ");
+  const html = pol + q + (p ? li("Profile", `p_payments: ${p}`) : "") + grants;
+  $("#g-ctl").innerHTML = html ? `<ul class="ruled" style="margin-top:6px">${html}</ul>` : '<div class="empty">Nothing found. Run governance_limits.sql.</div>';
+}
+function renderLimits() {
+  let box = $("#g-limits");
+  if (!box) {
+    box = document.createElement("div"); box.id = "g-limits"; box.className = "card";
+    box.innerHTML = `<div class="hd"><h2>Guardrails</h2><p class="muted small">Same data and same SQL. What changes is what each user is allowed to spend. Run a beat, then read the audit below.</p></div>
+      <div class="row" id="g-try">${BEATS.map((b, i) => `<button class="${b[3]}" data-i="${i}">${b[2]}</button>`).join("")}</div>
+      <div id="g-try-out" style="margin-top:12px"></div>
+      <h3 style="margin:18px 0 4px">In force</h3><div id="g-ctl"></div>`;
+    $("#g-audit").closest(".card").before(box);
+    $$("#g-try button").forEach(b => b.onclick = () => { const x = BEATS[+b.dataset.i]; runBeat(x[0], x[1]); });
+  }
+  renderControls();
 }
 
 /* ------------------------------------------------------------------ code */
@@ -558,3 +615,4 @@ async function loadCode() {
 </script>
 </body>
 </html>
+
