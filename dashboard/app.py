@@ -411,16 +411,115 @@ def govern():
             out["users"].append({"user": u, "label": meta["label"], "rows": objs(r), "stats": r["stats"]})
         except Exception as e:  # noqa: BLE001
             out["users"].append({"user": u, "label": meta["label"], "error": str(e)[:200], "rows": []})
-    try:
-        audit = Q("""SELECT formatDateTime(event_time, '%H:%i:%S', 'UTC') AS at, user, query_duration_ms AS ms, read_rows,
-                            formatReadableSize(read_bytes) AS read, substring(replaceRegexpAll(query, '\\\\s+', ' '), 1, 70) AS query
-                     FROM system.query_log WHERE type = 'QueryFinish' AND user IN ('sre_user', 'payments_user')
-                     ORDER BY event_time DESC LIMIT 8""")
-        out["audit"] = objs(audit)
-    except Exception as e:  # noqa: BLE001
-        out["audit"] = []
-        out["audit_note"] = str(e)[:160]
+    out["audit"], note = audit_rows()
+    if note:
+        out["audit_note"] = note
     return out
+
+
+# ---------------------------------------------------------------------------- governance guardrails
+GOV_USERS = ("sre_user", "payments_user")
+ERR_NAMES = {158: "TOO_MANY_ROWS", 159: "TIMEOUT_EXCEEDED", 201: "QUOTA_EXCEEDED", 241: "MEMORY_LIMIT_EXCEEDED", 497: "ACCESS_DENIED"}
+# heavy: no time filter, so it reads the whole table for sre_user and every payments row for payments_user.
+# attrs: touches a column payments_user is not granted.  light: cheap query for the quota burst.
+GOV_TRY_SQL = {
+    "heavy": "SELECT count() AS events, countIf(severity IN ('ERROR', 'FATAL')) AS errors FROM obs.logs",
+    "attrs": ("SELECT attrs['version'] AS version, count() AS n FROM obs.logs "
+              "WHERE service = 'payments' AND ts >= now() - INTERVAL 5 MINUTE GROUP BY version"),
+    "light": "SELECT count() AS n FROM obs.logs WHERE service = 'payments' AND ts >= now() - INTERVAL 1 MINUTE",
+}
+BURST_N = 30
+
+
+def parse_error(e: Exception) -> dict:
+    """ClickHouse errors arrive as 'Code: 497. DB::Exception: ...' or 'code: 497, server response: ...'."""
+    text = re.sub(r"\s+", " ", str(e))
+    m = re.search(r"[Cc]ode:? ?(\d+)", text)
+    code = int(m.group(1)) if m else None
+    dm = re.search(r"DB::Exception: (.*)", text)
+    return {"code": code, "name": ERR_NAMES.get(code, "ERROR"), "message": (dm.group(1) if dm else text)[:240]}
+
+
+def audit_rows() -> tuple[list, str | None]:
+    """Last queries by the two demo users, rejected ones included. Returns (rows, note)."""
+    try:
+        try:
+            cmd("SYSTEM FLUSH LOGS")  # query_log is written in batches; flush so the audit is current
+        except Exception:  # noqa: BLE001
+            pass
+        res = Q("""SELECT formatDateTime(event_time, '%H:%i:%S', 'UTC') AS at, user, query_duration_ms AS ms, read_rows,
+                          formatReadableSize(read_bytes) AS read,
+                          multiIf(type = 'QueryFinish', 'ok', exception_code = 158, 'TOO_MANY_ROWS',
+                                  exception_code = 159, 'TIMEOUT', exception_code = 201, 'QUOTA',
+                                  exception_code = 497, 'DENIED', concat('error ', toString(exception_code))) AS status,
+                          substring(replaceRegexpAll(query, '\\\\s+', ' '), 1, 70) AS query
+                   FROM system.query_log
+                   WHERE type IN ('QueryFinish', 'ExceptionBeforeStart', 'ExceptionWhileProcessing')
+                     AND user IN ('sre_user', 'payments_user') AND event_time > now() - INTERVAL 15 MINUTE
+                   ORDER BY event_time DESC LIMIT 10""")
+        return objs(res), None
+    except Exception as e:  # noqa: BLE001
+        return [], str(e)[:160]
+
+
+def _run_as(user: str, sql: str) -> dict:
+    t0 = time.perf_counter()
+    try:
+        res = Q(sql, user=user)
+        s = res["stats"]
+        return {"ok": True, "ms": s["ms"], "read_rows": s["read_rows"], "read_bytes": s["read_bytes"], "rows": objs(res)[:5]}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "ms": round((time.perf_counter() - t0) * 1000, 1), "error": parse_error(e)}
+
+
+@app.post("/api/govern/try")
+def govern_try(user: str, kind: str):
+    if user not in GOV_USERS:
+        raise HTTPException(400, "unknown user")
+    if kind == "burst":
+        ran, t0 = 0, time.perf_counter()
+        for _ in range(BURST_N):
+            out = _run_as(user, GOV_TRY_SQL["light"])
+            if not out["ok"]:
+                out.update(kind=kind, user=user, ran=ran, planned=BURST_N, ms=round((time.perf_counter() - t0) * 1000, 1))
+                return out
+            ran += 1
+        return {"ok": True, "kind": kind, "user": user, "ran": ran, "planned": BURST_N,
+                "ms": round((time.perf_counter() - t0) * 1000, 1)}
+    if kind not in ("heavy", "attrs"):
+        raise HTTPException(400, "unknown kind")
+    out = _run_as(user, GOV_TRY_SQL[kind])
+    out.update(kind=kind, user=user)
+    return out
+
+
+@app.get("/api/govern/controls")
+def govern_controls():
+    def safe(sql: str) -> list:
+        try:
+            return objs(Q(sql))
+        except Exception as e:  # noqa: BLE001
+            return [{"error": str(e)[:120]}]
+    return {
+        "grants": safe("""SELECT user_name, access_type, database, `table`,
+                                 arrayStringConcat(arrayFilter(x -> x != '', groupArray(ifNull(`column`, ''))), ', ') AS columns,
+                                 is_partial_revoke
+                          FROM system.grants WHERE user_name IN ('sre_user', 'payments_user')
+                          GROUP BY user_name, access_type, database, `table`, is_partial_revoke
+                          ORDER BY user_name, `table` LIMIT 20"""),
+        "policies": safe("""SELECT short_name AS policy, concat(database, '.', `table`) AS on_table, select_filter AS filter
+                            FROM system.row_policies ORDER BY short_name LIMIT 10"""),
+        "quota": safe("""SELECT quota_name, duration, max_queries, max_read_rows
+                         FROM system.quota_limits WHERE quota_name = 'q_payments'"""),
+        "profile": safe("""SELECT profile_name, setting_name, value FROM system.settings_profile_elements
+                           WHERE profile_name = 'p_payments' AND isNotNull(setting_name) ORDER BY index"""),
+    }
+
+
+@app.get("/api/govern/audit")
+def govern_audit():
+    rows, note = audit_rows()
+    return {"rows": rows, "note": note}
 
 
 CODE_FILES = {"schema": "schema.sql", "backfill": "backfill_logs.sql", "governance": "governance.sql", "metrics": "backfill_metrics.sql"}
