@@ -1,4 +1,3 @@
-
 # Observability without the per-GB meter
 
 A live demo of logs and metrics on ClickHouse, supported by EDB. A Go simulator publishes billions of
@@ -38,7 +37,7 @@ flowchart LR
 | Pipeline | Start and stop the stream, change the rate, trigger a bad deploy, load history, storage tiles |
 | Dashboard | Error rate, p99 and a service heatmap. Each panel shows rows read and time taken. A "Scan raw rows" toggle compares the rollup with the raw table |
 | Explore | Search logs by service, severity, window and text. The scan bar shows rows read and the share skipped by the index |
-| Govern | Per-user query accounting from the query log, plus row policies and quotas |
+| Govern | Per-user query accounting from the query log, plus row policies, quotas, query limits and column-level grants. A burst button fires 30 cheap queries as `payments_user` to trip the per-minute quota (see [Governance guardrails](#governance-guardrails)) |
 | Code | The schema and SQL behind everything above |
 
 ## Quick start
@@ -76,13 +75,77 @@ sudo ./stop-demo.sh --all            # also stop ClickHouse and Kafka
 Rates accept plain numbers or `k` and `m` suffixes. The console slider tops out near 316k events per second.
 
 A suggested run order for a 15-minute live demo: start the stream on the Pipeline tab, watch the Dashboard
-(compare rollup and raw scan), press Trigger bad deploy, find the cause on Explore, then show Govern.
+(compare rollup and raw scan), press Trigger bad deploy, find the cause on Explore, then show Govern: the row
+policy, a blocked column, a heavy query stopped by the limits, and the burst button tripping the quota.
+
+## Governance guardrails
+
+`sql/governance_limits.sql` adds three guardrails for `payments_user` on top of the existing row policy. It is
+additive and safe to re-run (`CREATE OR REPLACE`). It assumes `sre_user`, `payments_user` and the payments row
+policy already exist (created by `sql/governance.sql`).
+
+| Guardrail | Object | Configured value | Error when hit |
+| --- | --- | --- | --- |
+| Cap what one heavy query can consume | Settings profile `p_payments` | `max_rows_to_read` 600,000,000 (tune, see below), `max_execution_time` 20 s, `max_memory_usage` 4 GB, all set to throw | `TOO_MANY_ROWS` (158), `TIMEOUT_EXCEEDED` (159) |
+| Cap what one team can consume per minute | Quota `q_payments`, keyed by user, 1-minute window | 20 queries and 3,000,000,000 rows read per minute | `QUOTA_EXCEEDED` (201) |
+| Grant each team the tables and columns it needs | Column-level grant on `obs.logs` | `ts`, `service`, `host`, `severity`, `duration_ms`, `message`. `trace_id` and `attrs` are left out | `ACCESS_DENIED` (497) |
+
+The values above are configured limits, not measurements.
+
+Apply it as the admin user:
+
+```bash
+clickhouse-client --port 9094 --multiquery < sql/governance_limits.sql
+```
+
+**Size the row limit first.** The limit must sit above what the Govern panel reads and below what a full scan reads.
+Both numbers depend on the simulator rate, so re-check them if you rehearse at a different rate:
+
+```sql
+-- A: rows the Govern panel reads for payments_user (last hour). The limit must stay above this.
+SELECT count() FROM obs.logs WHERE service = 'payments' AND ts >= now() - INTERVAL 60 MINUTE;
+-- B: rows a full scan reads for payments_user (all history). The limit must stay below this.
+SELECT count() FROM obs.logs WHERE service = 'payments';
+```
+
+Pick a number between A and B (about 2 x A works) and put it in `max_rows_to_read`.
+
+**How the demo uses them**
+
+- **Heavy query:** run a full scan as `payments_user`. It is stopped by the row or time limit instead of taking the host.
+- **Burst:** the Govern tab burst button fires 30 cheap queries. The quota allows 20 per minute, so the 21st fails. The
+  window is one minute, so the user recovers on its own before the next step.
+- **Blocked column:** `SELECT attrs[...]` as `payments_user` fails with `ACCESS_DENIED`. The console's payments panel
+  reads only `ts`, `service` and `severity`, so it keeps working.
+
+**Notes on the column grant.** The script revokes the table-level `SELECT` on `obs.logs` and grants the column list.
+Check how `payments_user` is granted first with `SHOW GRANTS FOR payments_user;`. If the grant is on `obs.*` or comes
+from a role, a table-level `REVOKE` needs partial revokes (`access_control_improvements.enable_partial_revokes = 1`)
+or per-table grants. Adapt that block rather than running it as is.
+
+**Check what is in force**
+
+```sql
+SHOW CREATE SETTINGS PROFILE p_payments;
+SHOW CREATE QUOTA q_payments;
+SHOW GRANTS FOR payments_user;
+SELECT * FROM system.quota_usage WHERE quota_name = 'q_payments';
+```
+
+**Teardown** (back to the original demo):
+
+```sql
+DROP SETTINGS PROFILE IF EXISTS p_payments;
+DROP QUOTA IF EXISTS q_payments;
+REVOKE SELECT(ts, service, host, severity, duration_ms, message) ON obs.logs FROM payments_user;
+GRANT SELECT ON obs.logs TO payments_user;
+```
 
 ## Repository layout
 
 ```
 simulator/        Go event generator (obs-sim)
-sql/              schema, views, policies and the history backfill
+sql/              schema, views, policies, governance limits and the history backfill
 dashboard/        FastAPI console (app.py) and requirements
 install/          install scripts and systemd units
 reset-demo.sh     reset or retune the demo
@@ -118,6 +181,9 @@ Measured on the reference host (16 vCPU, 64 GB, 4 TB disk at 16,000 IOPS, one no
 - **Single node:** the demo shows no replication or sharding. Do not extrapolate throughput to other hardware.
 - **Synthetic data:** compression, selectivity and timings will differ on real logs.
 - **Scope:** logs and metrics only. No traces and no alerting.
+- **Governance limits are tuned per rate:** the `max_rows_to_read` value in `p_payments` depends on how much data is
+  loaded and on the simulator rate. Re-size it before each rehearsal (see Governance guardrails). The limits apply to
+  `payments_user` only.
 
 ## Troubleshooting
 
@@ -128,11 +194,14 @@ Measured on the reference host (16 vCPU, 64 GB, 4 TB disk at 16,000 IOPS, one no
 | `obs-sim` fails with "address already in use" on 8090 | A stale `obs-sim` is running. `pkill -x obs-sim`, then `reset-demo.sh` |
 | Dashboard blank or "Internal Server Error" | Check `journalctl -u obs-dash -n 50`. Known causes: shared ClickHouse session (use `autogenerate_session_id=False`) and an empty previous window returning NaN |
 | Rates look low after a reset | Wait 60 seconds before quoting rows per second |
+| Govern panel fails with `TOO_MANY_ROWS` for `payments_user` | `max_rows_to_read` in `p_payments` is now below what the panel reads, usually after a rate or data change. Re-run the sizing queries and update the limit |
+| Burst button never trips the quota | Check that `q_payments` exists and is applied to `payments_user` with `SELECT * FROM system.quota_usage WHERE quota_name = 'q_payments'` |
+| Column grant block fails or access is unchanged | `payments_user` was granted on `obs.*` or through a role. See the notes on the column grant above |
 
 ## Notes
 
 - Keys and credentials are not committed. See `.gitignore`.
 - The open-source engine is unmodified ClickHouse. This repository is a demo, not a product.
-                                                                                                                                                                                                              
+                                                                                                
                                                                                                                                                                                                
 
