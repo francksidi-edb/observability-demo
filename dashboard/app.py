@@ -157,9 +157,11 @@ def health():
         last = Q("SELECT toUnixTimestamp(max(ts)) FROM obs.logs WHERE ts >= now() - INTERVAL 10 MINUTE")
         tables = {r["table"]: r for r in objs(parts)}
         lg = _merge_logs(tables)
+        tables["logs"] = {**tables.get("logs", {}), **lg}
+        cold_n = _cold_rows()
         mx = last["rows"][0][0] if last["rows"] and last["rows"][0][0] else None
         return {"ok": True, "version": v["rows"][0][0], "timezone": v["rows"][0][1], "tables": tables,
-                "log_rows": lg.get("rows", 0), "compressed": lg.get("comp", 0), "uncompressed": lg.get("unc", 0),
+                "log_rows": lg.get("rows", 0) + cold_n, "local_rows": lg.get("rows", 0), "cold_rows": cold_n, "compressed": lg.get("comp", 0), "uncompressed": lg.get("unc", 0),
                 "bytes_per_row": round(lg["comp"] / lg["rows"], 1) if lg.get("rows") else None,
                 "ratio": round(lg["unc"] / lg["comp"], 1) if lg.get("comp") else None,
                 "latest_ts": mx, "lag_s": round(time.time() - mx, 1) if mx else None, "now": time.time(),

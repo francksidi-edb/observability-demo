@@ -156,7 +156,7 @@ details.snip[open] summary::before { transform:rotate(45deg); }
     <g id="flow-nodes"></g></svg></div>
   <div class="pillars">
     <div class="pillar"><div class="top"><span class="no">01</span><img src="/static/icons/real_time.svg" alt=""></div><h3>Ingest</h3><p>A Go program emits <b>JSON events</b> for a fleet of services and Postgres clusters. Kafka buffers them, and ClickHouse consumes the topics with its Kafka engine.</p></div>
-    <div class="pillar"><div class="top"><span class="no">02</span><img src="/static/icons/warehouse.svg" alt=""></div><h3>Store</h3><p>One <b>MergeTree</b> table per signal, sorted by service, severity and time, compressed column by column, expired by a 90-day TTL.</p></div>
+    <div class="pillar"><div class="top"><span class="no">02</span><img src="/static/icons/warehouse.svg" alt=""></div><h3>Store</h3><p>Recent logs sit in a <b>MergeTree</b> table sorted by service, severity and time. After the retention window a job moves each partition to <b>Iceberg</b> on object storage, and the same table name still answers.</p></div>
     <div class="pillar"><div class="top"><span class="no">03</span><img src="/static/icons/analytical.svg" alt=""></div><h3>Query</h3><p>The sort key and a sparse index let a search read <b>only the ranges that match</b>. Rows read and time are shown next to every result.</p></div>
     <div class="pillar"><div class="top"><span class="no">04</span><img src="/static/icons/machine_learning.svg" alt=""></div><h3>Time series</h3><p><b>Materialized views</b> keep per-minute rollups next to the raw rows, so 30 days of charts cost the same as 30 minutes.</p></div>
     <div class="pillar"><div class="top"><span class="no">05</span><img src="/static/icons/governance.svg" alt=""></div><h3>Govern</h3><p><b>Roles, row policies and quotas</b> in the database, and every query lands in the query log.</p></div>
@@ -380,8 +380,8 @@ async function refreshHealth() {
 }
 function renderStorage(h) {
   const t = h.tables || {}, lg = t.logs || {};
-  const tiles = [["Raw logs on disk", bytes(h.compressed), `${human(h.log_rows)} rows`], ["Bytes per row", h.bytes_per_row ?? "–", "compressed, all columns"],
-    ["Compression", h.ratio ? h.ratio + "×" : "–", `${bytes(h.uncompressed)} uncompressed`], ["Active parts", nf(lg.parts), `${nf(lg.partitions)} daily partitions`],
+  const tiles = [["Raw logs on disk", bytes(h.compressed), `${human(h.local_rows ?? h.log_rows)} rows local` + (h.cold_rows ? ` · ${human(h.cold_rows)} in Iceberg` : "")], ["Bytes per row", h.bytes_per_row ?? "–", "compressed, all columns"],
+    ["Compression", h.ratio ? h.ratio + "×" : "–", `${bytes(h.uncompressed)} uncompressed`], ["Active parts", nf(lg.parts), `${nf(lg.partitions)} partitions`],
     ["Rollup rows (1 min)", human((t.svc_1m||{}).rows), `${bytes((t.svc_1m||{}).comp)} on disk`], ["Metric samples", human((t.metrics||{}).rows), `${bytes((t.metrics||{}).comp)} on disk`]];
   $("#storage").innerHTML = tiles.map(x => `<div class="tile"><div class="k">${x[0]}</div><div class="v">${x[1]}</div><div class="d">${x[2]}</div></div>`).join("");
 }
@@ -404,9 +404,9 @@ function renderFlow() {
   const arr = x => `<line class="flow" x1="${x}" y1="100" x2="${x+78}" y2="100" stroke="#567f8d" stroke-width="2.2" marker-end="url(#ah)"/>`;
   $("#flow-nodes").innerHTML = node(24,"Go simulator","200+ hosts, 7 services", s.error?"offline":nf(s.eps)+" ev/s") + arr(262) +
     node(360,"Kafka","topics: logs, metrics", "8 partitions") + arr(598) +
-    node(696,"ClickHouse","MergeTree + rollups", human(h.log_rows)+" rows", true) + arr(934) +
+    node(696,"ClickHouse","hot MergeTree + Iceberg", human(h.log_rows)+" rows", true) + arr(934) +
     `<g><rect x="1030" y="40" width="130" height="120" rx="10" fill="#e8f2f5"/><text class="nt" x="1046" y="76" font-size="22" fill="#28495a">Console</text><text x="1046" y="100" font-size="13" fill="#567f8d">this page</text><text class="nt" x="1046" y="140" font-size="22" fill="#28495a">&lt; 1 s</text></g>` +
-    `<text x="24" y="205" font-size="12" fill="#567f8d">Live events: Go → Kafka → ClickHouse Kafka engine → materialized view → MergeTree. History: INSERT … SELECT inside ClickHouse.</text>`;
+    `<text x="24" y="205" font-size="12" fill="#567f8d">Live events: Go → Kafka → ClickHouse Kafka engine → materialized view → MergeTree. After the retention window a job moves each partition to Iceberg on object storage. History: INSERT … SELECT.</text>`;
 }
 
 /* ------------------------------------------------------------------ pipeline */
