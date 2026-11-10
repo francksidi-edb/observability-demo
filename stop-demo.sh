@@ -44,7 +44,7 @@ sleep 1
 printf '%-10s %s\n' obs-sim "$(systemctl is-active obs-sim 2>&1)"
 
 # give ClickHouse a moment to drain what is already buffered in Kafka
-if [[ $ALL -eq 1 ]] && systemctl is-active --quiet clickhouse-server; then
+if [[ $ALL -eq 1 ]] && systemctl is-active --quiet antalya; then
   echo "waiting 10 s for Kafka to drain into ClickHouse..."
   sleep 10
 fi
@@ -68,9 +68,9 @@ fi
 
 if [[ $ALL -eq 1 ]]; then
   say "Stopping ClickHouse and Kafka"
-  systemctl stop clickhouse-server
+  systemctl stop antalya
   systemctl stop kafka
-  for s in clickhouse-server kafka; do printf '%-18s %s\n' "$s" "$(systemctl is-active "$s" 2>&1)"; done
+  for s in antalya kafka; do printf '%-18s %s\n' "$s" "$(systemctl is-active "$s" 2>&1)"; done
 fi
 
 if [[ $DISABLE -eq 1 ]]; then

@@ -1,0 +1,17 @@
+{
+  "clickhouse": { "host": "127.0.0.1", "http_port": 8123, "user": "default", "password": "CHANGE_ME" },
+  "tiering": {
+    "mode": "insert",
+    "step_min": 10,
+    "catalog_db": "ice",
+    "cold_name": "obs.logs_cold",
+    "cluster": "demo",
+    "s3_endpoint": "http://127.0.0.1:9100",
+    "bucket": "warehouse",
+    "access_key": "CHANGE_ME",
+    "secret_key": "CHANGE_ME",
+    "ice_cmd": ["env", "PATH=/path/to/java21/bin:/usr/local/bin:/usr/bin:/bin", "JAVA_HOME=/path/to/java21",
+                "AWS_ENDPOINT_URL_S3=http://127.0.0.1:9100", "AWS_ACCESS_KEY_ID=CHANGE_ME", "AWS_SECRET_ACCESS_KEY=CHANGE_ME",
+                "AWS_REGION=us-east-1", "/usr/local/bin/ice", "--config", "/opt/ice/.ice.yaml"]
+  }
+}

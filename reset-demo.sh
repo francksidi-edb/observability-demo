@@ -70,7 +70,7 @@ PY
 
 status() {
   say "Services"
-  for s in clickhouse-server kafka obs-sim obs-dash; do
+  for s in antalya kafka obs-sim obs-dash; do
     printf '%-18s %s\n' "$s" "$(systemctl is-active "$s" 2>&1)"
   done
   say "Ports"
@@ -130,7 +130,7 @@ wait_for() {  # wait_for <name> <timeout-seconds> <command...>
   done
   return 1
 }
-for s in kafka clickhouse-server; do
+for s in kafka antalya; do
   if ! systemctl is-active --quiet "$s"; then
     echo "$s is down, starting it"
     if ! systemctl start "$s"; then
