@@ -25,6 +25,11 @@ flowchart LR
   cold --> tier
   view --> app[Observability console :8088]
   roll --> app
+  roll --> det[Detector on svc_1m]
+  det --> agent[Claude agent: read-only SQL, proposes]
+  agent -- you approve --> sim
+  det --> app
+  agent --> app
 ```
 
 ## What is in the repository
@@ -35,6 +40,8 @@ flowchart LR
 | `sql/` | `schema.sql` (Kafka tables, views, rollups), backfill, fleet and governance SQL. |
 | `dashboard/` | FastAPI console (`app.py`), the Tiering API (`tiering.py`), the tiering job (`tier_job.py`, `tier.sh`) and `static/`. |
 | `install/` | Numbered setup scripts for OS tuning, ClickHouse, Kafka, the apps, schema, backfill and governance. |
+| `dashboard/agent.py`, `dashboard/static/agent.js` | The Alerts / Agent tab: detector, Claude investigation, approve or dismiss. |
+| `sql/agent.sql`, `sql/agent_user.sh` | The read-only `agent_user`, its limits and row policies, and the alert table. |
 | `reset-demo.sh`, `stop-demo.sh` | Start the demo at a chosen rate, and stop it again. |
 
 ## Requirements
@@ -45,6 +52,7 @@ flowchart LR
   tables and `INSERT INTO` Iceberg are experimental features there. The base demo also runs on the EDB build installed
   by `install/10_install_clickhouse.sh`.
 - Kafka, Go (to build the simulator), Python 3.9 or later with the packages in `dashboard/requirements.txt`.
+- For the Alerts / Agent tab: a Claude API key and outbound HTTPS to `api.anthropic.com`.
 - For tiering: MinIO or S3, the `ice` CLI and `ice-rest-catalog` (they need Java 21), and a ClickHouse database
   called `ice` created with `ENGINE = DataLakeCatalog(...)`.
 
@@ -75,6 +83,7 @@ tiering, the object-storage settings. `config.json` is ignored by git.
 | Explore | Search over raw rows by service, severity, text or trace ID, with the rows read and the share skipped by the index. |
 | Govern | The same query as two users, a guardrail that rejects a heavy query, and the audit of what ran. |
 | Tiering | Hot partitions with a countdown, the policy, a run log, direct writes to Iceberg, and a same-query comparison across tiers. |
+| Alerts / Agent | A detector that opens an alert when a service's error rate jumps, Claude's investigation, and Approve or Dismiss. |
 | Code | Every statement behind the demo, ready to copy. |
 
 ## Governance
@@ -137,6 +146,67 @@ becomes eligible once it has been closed for the "Tier after" time; the partitio
 - Hybrid tables and `INSERT INTO` Iceberg are experimental and need the Antalya build.
 - Hybrid reads its hot side through `cluster('demo', ...)`, so the cluster must be defined in the ClickHouse config.
 
+## Alerts / Agent: an AI agent that investigates a bad deploy and asks before it acts
+
+A detector watches the per-minute error rate of every service in `obs.svc_1m`. When one jumps to at least 4x its own
+30-minute baseline (and at least 5%, over at least 2,000 events), it opens an alert. Claude then investigates with
+read-only SQL as the ClickHouse user `agent_user`, splitting the errors by release version, host and region, and
+**proposes** one action. Nothing runs until a person clicks **Approve** in the console.
+
+```
+Trigger bad deploy -> logs -> svc_1m -> detector (every 15 s) -> alert -> Claude (read-only SQL) -> proposal -> Approve -> rollback
+```
+
+| Part | What it is |
+| :-- | :-- |
+| `dashboard/agent.py` | Detector, Claude tool loop (standard library only), approve and dismiss, `/api/agent/*` routes. |
+| `dashboard/static/agent.js` | The **Alerts / Agent** tab. |
+| `sql/agent.sql`, `sql/agent_user.sh` | The read-only `agent_user`, its limits and row policies, and the alert table `obs.agent_alerts`. |
+| `dashboard/patch_agent.py` | Adds the tab to an existing dashboard. Safe to run twice. |
+
+Tools Claude has: `query_logs` (one bounded SELECT on `obs.logs_hot` or `obs.svc_1m`), `get_deploy_status`, and
+`propose_action` (`rollback_deploy` or `notify_only`). It has no tool that changes anything. Approving a rollback calls the
+simulator's `/incident?on=0`, at most once per service every two minutes.
+
+Guardrails: SELECT only; two tables; a time filter is required on `logs_hot`; the ClickHouse profile `agent_profile` caps
+execution time, rows read and rows returned; log text is treated as data, not instructions; every query is recorded in
+`system.query_log` as `agent_user`, so it shows in the Audit panel.
+
+### Set it up
+
+```bash
+clickhouse-client --port 9094 --multiquery < sql/agent.sql    # agent_user, limits, obs.agent_alerts
+bash sql/agent_user.sh                                         # row policies, and a check that agent_user sees data
+python3 dashboard/patch_agent.py dashboard                     # adds the tab; edits app.py, index.html, config.json
+```
+
+Then put your Claude API key in `dashboard/config.json` (ignored by git) and restart the console:
+
+```json
+"agent": { "model": "claude-sonnet-5-5", "api_key": "sk-ant-...", "ch_user": "agent_user", "ch_password": "agent_demo_pw" }
+```
+
+You can set `ANTHROPIC_API_KEY` in the console's environment instead. The host needs outbound HTTPS to `api.anthropic.com`.
+Thresholds (`factor`, `min_pct`, `min_events`, `interval_s`, `cooldown_min`) can also go in that block.
+
+### Try it
+
+1. Open **Alerts / Agent** and tick **Watch for incidents**. All four checks should be green.
+2. Click **Trigger bad deploy** (or use the button on the Pipeline tab).
+3. Within about a minute `payments` turns orange and an alert opens. Claude's queries and results appear as it works.
+4. Read the diagnosis, then click **Approve rollback**. The error rate falls and the alert resolves by itself.
+
+Tick **Watch** before triggering: the detector compares the current minute with the 30 minutes before it, so an incident that
+has already run for many minutes no longer looks abnormal.
+
+### Limits
+
+- A live model call takes 10 to 40 seconds and costs API credit, once per alert. Keep a recording as a fallback for a talk.
+- The detector only runs while the console runs. If it stops, nothing is detected.
+- The release system here is the simulator. A real deployment needs `get_deploy_status` and the approve action pointed at your
+  own release tooling.
+- The detector measures `errs` against `cnt` in `svc_1m`; it does not look at latency.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
@@ -150,6 +220,10 @@ becomes eligible once it has been closed for the "Tier after" time; the partitio
 | Console search slow on a wide window | Newest-first sort reads the whole window | Search reads the newest minute first, then widens. |
 | Scan through `obs.logs` slow | The `ts` filters in the view force reading the `ts` column for every row | Keep `logs_hist` free of rows at or after the boundary and drop the filters. |
 | `systemctl start obs-dash` hangs | The unit orders itself after the old `clickhouse-server` service | Point `After=` at `antalya.service`. |
+| Alerts / Agent: key chip is red | No Claude API key | Set `agent.api_key` in `dashboard/config.json` or `ANTHROPIC_API_KEY`, then restart the console. |
+| Alert shows `Claude API HTTP 401` | The key is wrong or revoked | Fix the key, restart, click **Investigate again**. |
+| `agent_user` chip red, or it sees no rows | A row policy hides the rows | Run `bash sql/agent_user.sh` and read its output. |
+| No alert after Trigger bad deploy | **Watch** is off, or the incident is older than the 30-minute baseline | Tick **Watch**, then end and re-trigger the incident. |
 
 ## License and credits
 
