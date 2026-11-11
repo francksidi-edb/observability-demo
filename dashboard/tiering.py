@@ -21,6 +21,7 @@ from tier_job import Tier, TierError
 
 _ctx: dict = {}
 _cold_cache = {"t": 0.0, "v": 0}
+_state_cache = {"last": None, "direct_t": 0.0, "direct_v": 0, "cold_exists": False}
 POLICY = {"age_min": 60.0, "auto": False, "interval_s": 30}
 JOB = {"state": "idle", "steps": [], "started": None, "finished": None, "error": None, "tiered": 0}
 _job_lock = threading.Lock()
@@ -93,12 +94,28 @@ def mount(app, Q, cmd, objs, CFG):
                 return {"setup": False, "policy": POLICY, "job": JOB, "mode": t.cfg["mode"]}
             parts = t.partitions(POLICY["age_min"])
             wm = t.meta_get("wm")
-            return {"setup": True, "policy": POLICY, "job": JOB, "mode": t.cfg["mode"], "step_min": t.cfg["step_min"],
-                    "partitions": parts, "hot_rows": sum(int(p["rows"]) for p in parts), "hot_bytes": sum(int(p["bytes"]) for p in parts),
-                    "hist_rows": int(t.one("SELECT total_rows FROM system.tables WHERE database = 'obs' AND name = 'logs_hist'") or 0), "cold_rows": t.cold_rows(), "cold_exists": t.cold_exists(), "watermark": wm, "history_boundary": t.meta_get("H"),
-                    "runs": t.runs(), "direct": t.direct_count() if wm and t.cold_exists() else 0,
-                    "server_now": t.one("SELECT toString(now('UTC'))")}
+            running = JOB["state"] == "running"
+            if not _state_cache["cold_exists"]:
+                _state_cache["cold_exists"] = bool(t.cold_exists())
+            cold_exists = _state_cache["cold_exists"]
+            cold_rows = cold_rows_cached() if cold_exists else None
+            if wm and cold_exists and not running and time.time() - _state_cache["direct_t"] > 60:
+                _state_cache["direct_t"] = time.time()
+                try:
+                    _state_cache["direct_v"] = t.direct_count()
+                except Exception:  # noqa: BLE001
+                    pass
+            st = {"setup": True, "policy": POLICY, "job": JOB, "mode": t.cfg["mode"], "step_min": t.cfg["step_min"],
+                  "partitions": parts, "hot_rows": sum(int(x["rows"]) for x in parts), "hot_bytes": sum(int(x["bytes"]) for x in parts),
+                  "hist_rows": int(t.one("SELECT total_rows FROM system.tables WHERE database = 'obs' AND name = 'logs_hist'") or 0),
+                  "cold_rows": cold_rows, "cold_exists": cold_exists, "watermark": wm, "history_boundary": t.meta_get("H"),
+                  "runs": t.runs(), "direct": _state_cache["direct_v"] if wm and cold_exists else 0,
+                  "server_now": t.one("SELECT toString(now('UTC'))")}
+            _state_cache["last"] = st
+            return st
         except Exception as e:  # noqa: BLE001
+            if _state_cache["last"] is not None:
+                return {**_state_cache["last"], "policy": POLICY, "job": JOB, "stale": True, "error": str(e)[:200]}
             return {"setup": False, "error": str(e)[:300], "policy": POLICY, "job": JOB}
 
     @app.post("/api/tier/policy")
