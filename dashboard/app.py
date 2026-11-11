@@ -591,6 +591,12 @@ try:
 except Exception as _e:  # noqa: BLE001
     print("tiering disabled:", _e)
 
+try:
+    import agent
+    agent.mount(app, CFG)
+except Exception as _e:  # noqa: BLE001
+    print("agent disabled:", _e)
+
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 
 if __name__ == "__main__":
